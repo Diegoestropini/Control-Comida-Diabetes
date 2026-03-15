@@ -1584,13 +1584,14 @@ function getTimeInRangeTone(value) {
   }
 
   const background = value >= 90
-    ? interpolateColor(value, 90, 100, "#8fefad", "#d9f99d")
+    ? interpolateColor(value, 90, 100, "#6ee7b7", "#bef264")
     : value >= 70
       ? interpolateColor(value, 70, 90, "#166534", "#8fefad")
       : interpolateMultiStop(value, [
           { value: 0, color: "#dc2626" },
           { value: 35, color: "#f97316" },
-          { value: 70, color: "#166534" },
+          { value: 55, color: "#ea9a3b" },
+          { value: 70, color: "#b88a2f" },
         ]);
 
   return { background, color: getReadableTextColor(background) };
