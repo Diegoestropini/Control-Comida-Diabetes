@@ -1,6 +1,7 @@
 :root {
   --bg: #09111f;
   --bg-deep: #050914;
+  --bg-top: #0b1424;
   --panel: rgba(11, 21, 38, 0.84);
   --panel-strong: rgba(15, 28, 48, 0.96);
   --panel-border: rgba(145, 178, 227, 0.14);
@@ -27,16 +28,32 @@
   box-sizing: border-box;
 }
 
+html {
+  min-height: 100%;
+  background-color: var(--bg-deep);
+}
+
 body {
   margin: 0;
   min-height: 100vh;
   font-family: "Manrope", sans-serif;
   color: var(--text);
+  background-color: var(--bg-deep);
+  position: relative;
+  isolation: isolate;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   background:
     radial-gradient(circle at top left, rgba(140, 124, 255, 0.24), transparent 26%),
     radial-gradient(circle at top right, rgba(37, 174, 255, 0.18), transparent 28%),
     radial-gradient(circle at bottom center, rgba(84, 214, 148, 0.08), transparent 28%),
-    linear-gradient(180deg, #0b1424 0%, var(--bg) 48%, var(--bg-deep) 100%);
+    linear-gradient(180deg, var(--bg-top) 0%, var(--bg) 48%, var(--bg-deep) 100%);
 }
 
 button,
@@ -55,9 +72,16 @@ textarea {
 .hero,
 .panel {
   background: var(--panel);
-  backdrop-filter: blur(18px);
   border: 1px solid var(--panel-border);
   box-shadow: var(--shadow);
+}
+
+@supports ((-webkit-backdrop-filter: blur(10px)) or (backdrop-filter: blur(10px))) {
+  .hero,
+  .panel {
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
 }
 
 .hero {
@@ -1123,7 +1147,13 @@ textarea {
   position: absolute;
   inset: 0;
   background: rgba(2, 8, 18, 0.74);
-  backdrop-filter: blur(8px);
+}
+
+@supports ((-webkit-backdrop-filter: blur(6px)) or (backdrop-filter: blur(6px))) {
+  .modal-backdrop {
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+  }
 }
 
 .modal-card {
