@@ -456,6 +456,9 @@ function renderInsights(insights) {
           <span>Base del calculo</span>
           <span>${insights.glucoseVariability.basisLabel}</span>
         </div>
+        <div class="insight-variability-summary">
+          ${insights.glucoseVariability.summaryLabel}
+        </div>
       </div>
     </article>
 
@@ -1060,6 +1063,7 @@ function computeGlucoseVariability(metrics) {
       maxDisplay: "Sin datos",
       basisLabel: "Todavia no hay indicadores diarios",
       levelLabel: "Todavia no hay indicadores diarios",
+      summaryLabel: "Cargá indicadores diarios para ver una lectura simple del promedio y la estabilidad.",
       tone: "neutral",
       exportable: { deviation: null, cv: null, min: null, max: null, range: null },
     };
@@ -1072,12 +1076,7 @@ function computeGlucoseVariability(metrics) {
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = roundMetric(max - min);
-  const levelLabel = cv === null
-    ? "No se pudo calcular el CV"
-    : cv < 36
-      ? "Variabilidad entre promedios diarios dentro de objetivo"
-      : "Variabilidad entre promedios diarios elevada";
-  const tone = cv === null ? "neutral" : cv < 36 ? "good" : "danger";
+  const interpretation = describeGlucoseVariability(avg, cv);
 
   return {
     deviation,
@@ -1090,8 +1089,9 @@ function computeGlucoseVariability(metrics) {
     minDisplay: formatGlucose(min),
     maxDisplay: formatGlucose(max),
     basisLabel: "Basado en promedios diarios; no reemplaza CGM ni lecturas intradia",
-    levelLabel,
-    tone,
+    levelLabel: interpretation.levelLabel,
+    summaryLabel: interpretation.summaryLabel,
+    tone: interpretation.tone,
     exportable: {
       deviation,
       cv,
@@ -1099,6 +1099,119 @@ function computeGlucoseVariability(metrics) {
       max,
       range,
     },
+  };
+}
+
+function describeGlucoseVariability(averageGlucose, cv) {
+  if (!Number.isFinite(averageGlucose) || !Number.isFinite(cv)) {
+    return {
+      levelLabel: "No se pudo calcular el CV",
+      summaryLabel: "Faltan datos para combinar estabilidad y promedio.",
+      tone: "neutral",
+    };
+  }
+
+  const averageBand = averageGlucose <= 70
+    ? "low"
+    : averageGlucose <= 154
+      ? "target"
+      : averageGlucose <= 180
+        ? "high"
+        : "veryHigh";
+  const variabilityBand = cv < 18 ? "veryStable" : cv < 36 ? "stable" : "unstable";
+
+  if (variabilityBand === "veryStable" && averageBand === "target") {
+    return {
+      levelLabel: "Variabilidad muy buena y promedio en objetivo",
+      summaryLabel: "Estable y en valores saludables.",
+      tone: "good",
+    };
+  }
+
+  if (variabilityBand === "veryStable" && averageBand === "high") {
+    return {
+      levelLabel: "Variabilidad muy buena, pero promedio alto",
+      summaryLabel: "Estable, pero estable en valores elevados.",
+      tone: "warning",
+    };
+  }
+
+  if (variabilityBand === "veryStable" && averageBand === "veryHigh") {
+    return {
+      levelLabel: "Variabilidad muy buena, pero promedio muy alto",
+      summaryLabel: "Muy estable, pero sostenido en valores demasiado altos.",
+      tone: "danger",
+    };
+  }
+
+  if (variabilityBand === "veryStable" && averageBand === "low") {
+    return {
+      levelLabel: "Variabilidad muy buena, pero promedio bajo",
+      summaryLabel: "Estable, pero tirando a valores bajos.",
+      tone: "warning",
+    };
+  }
+
+  if (variabilityBand === "stable" && averageBand === "target") {
+    return {
+      levelLabel: "Variabilidad dentro de objetivo",
+      summaryLabel: "Bastante estable y con promedio en objetivo.",
+      tone: "good",
+    };
+  }
+
+  if (variabilityBand === "stable" && averageBand === "high") {
+    return {
+      levelLabel: "Variabilidad aceptable, pero promedio alto",
+      summaryLabel: "Relativamente estable, pero con promedio elevado.",
+      tone: "warning",
+    };
+  }
+
+  if (variabilityBand === "stable" && averageBand === "veryHigh") {
+    return {
+      levelLabel: "Variabilidad aceptable, pero promedio muy alto",
+      summaryLabel: "Hay estabilidad, pero en un nivel demasiado alto.",
+      tone: "danger",
+    };
+  }
+
+  if (variabilityBand === "stable" && averageBand === "low") {
+    return {
+      levelLabel: "Variabilidad aceptable, pero promedio bajo",
+      summaryLabel: "Relativamente estable, aunque en valores bajos.",
+      tone: "warning",
+    };
+  }
+
+  if (averageBand === "target") {
+    return {
+      levelLabel: "Variabilidad elevada",
+      summaryLabel: "El promedio no está mal, pero hay demasiados altibajos.",
+      tone: "warning",
+    };
+  }
+
+  if (averageBand === "low") {
+    return {
+      levelLabel: "Variabilidad elevada con promedio bajo",
+      summaryLabel: "Inestable y con tendencia a valores bajos.",
+      tone: "danger",
+    };
+  }
+
+  if (averageBand === "high") {
+    return {
+      levelLabel: "Variabilidad elevada y promedio alto",
+      summaryLabel: "Inestable y además en valores elevados.",
+      tone: "danger",
+    };
+  }
+
+  return {
+    levelLabel: "Variabilidad elevada y promedio muy alto",
+    summaryLabel: "Inestable y sostenido en valores demasiado altos.",
+    tone: "danger",
   };
 }
 
