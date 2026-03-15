@@ -13,6 +13,14 @@
   --blue: #73b8ff;
   --highlight: #8c7cff;
   --text-strong: #06111d;
+  --lunch-accent: #f2b66d;
+  --lunch-glow: rgba(242, 182, 109, 0.18);
+  --dinner-accent: #e68a5f;
+  --dinner-glow: rgba(230, 138, 95, 0.18);
+  --metrics-neon: #49f2c2;
+  --metrics-neon-glow: rgba(73, 242, 194, 0.2);
+  --summary-neon: #5cd6ff;
+  --summary-neon-glow: rgba(92, 214, 255, 0.18);
 }
 
 * {
@@ -171,11 +179,38 @@ label span,
   border: 1px solid rgba(145, 178, 227, 0.12);
 }
 
+.neon-metrics-card {
+  background:
+    radial-gradient(circle at top right, rgba(73, 242, 194, 0.18), transparent 30%),
+    radial-gradient(circle at bottom left, rgba(70, 170, 255, 0.12), transparent 36%),
+    linear-gradient(180deg, rgba(11, 34, 39, 0.97), rgba(7, 19, 27, 0.99));
+  border-color: rgba(73, 242, 194, 0.24);
+  box-shadow:
+    inset 0 1px 0 rgba(169, 255, 233, 0.1),
+    0 0 0 1px rgba(73, 242, 194, 0.04);
+}
+
 .meal-card {
   border-radius: 22px;
   padding: 20px;
   background: linear-gradient(180deg, rgba(16, 31, 54, 0.96), rgba(9, 17, 31, 0.98));
   border: 1px solid rgba(145, 178, 227, 0.12);
+}
+
+.meal-card-lunch {
+  background:
+    radial-gradient(circle at top right, rgba(255, 214, 153, 0.14), transparent 32%),
+    linear-gradient(180deg, rgba(43, 31, 18, 0.96), rgba(23, 17, 13, 0.98));
+  border-color: rgba(242, 182, 109, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 226, 184, 0.08);
+}
+
+.meal-card-dinner {
+  background:
+    radial-gradient(circle at top right, rgba(255, 170, 120, 0.12), transparent 34%),
+    linear-gradient(180deg, rgba(39, 24, 22, 0.96), rgba(20, 13, 14, 0.98));
+  border-color: rgba(230, 138, 95, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 214, 194, 0.08);
 }
 
 .meal-card-header {
@@ -193,16 +228,48 @@ label span,
   background: rgba(255, 255, 255, 0.08);
 }
 
+.meal-card-lunch .meal-label {
+  color: var(--lunch-accent);
+}
+
+.meal-card-dinner .meal-label {
+  color: var(--dinner-accent);
+}
+
 .meal-badge.lunch {
-  color: #ffd166;
+  color: var(--lunch-accent);
+  background: var(--lunch-glow);
+  border: 1px solid rgba(242, 182, 109, 0.18);
 }
 
 .meal-badge.dinner {
-  color: #8fc9ff;
+  color: var(--dinner-accent);
+  background: var(--dinner-glow);
+  border: 1px solid rgba(230, 138, 95, 0.18);
 }
 
 .meal-badge.metrics {
-  color: #8ce6b6;
+  color: var(--metrics-neon);
+  background: var(--metrics-neon-glow);
+  border: 1px solid rgba(73, 242, 194, 0.2);
+}
+
+.neon-metrics-card .meal-label {
+  color: var(--metrics-neon);
+}
+
+.neon-summary-panel {
+  background:
+    radial-gradient(circle at top right, rgba(92, 214, 255, 0.16), transparent 28%),
+    radial-gradient(circle at bottom left, rgba(89, 124, 255, 0.12), transparent 34%),
+    rgba(11, 21, 38, 0.9);
+  border-color: rgba(92, 214, 255, 0.18);
+}
+
+.neon-summary-panel .panel-kicker,
+.neon-summary-panel .chart-header h3,
+.neon-summary-panel .mini-panel h3 {
+  color: var(--summary-neon);
 }
 
 .meal-form {
@@ -379,6 +446,14 @@ textarea {
   background: rgba(15, 28, 48, 0.88);
   border-radius: 18px;
   border: 1px solid rgba(145, 178, 227, 0.08);
+}
+
+.neon-summary-panel .stat-card,
+.neon-summary-panel .timeline-chart,
+.neon-summary-mini {
+  background: linear-gradient(180deg, rgba(10, 26, 46, 0.94), rgba(7, 18, 34, 0.98));
+  border-color: rgba(92, 214, 255, 0.16);
+  box-shadow: inset 0 1px 0 rgba(166, 236, 255, 0.06);
 }
 
 .stat-card {

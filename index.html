@@ -42,7 +42,7 @@
         <div id="notice" class="notice" aria-live="polite"></div>
 
         <div class="meal-grid">
-          <article class="meal-card">
+          <article class="meal-card meal-card-lunch">
             <div class="meal-card-header">
               <div>
                 <p class="meal-label">Almuerzo</p>
@@ -115,7 +115,7 @@
             </form>
           </article>
 
-          <article class="meal-card">
+          <article class="meal-card meal-card-dinner">
             <div class="meal-card-header">
               <div>
                 <p class="meal-label">Cena</p>
@@ -189,7 +189,7 @@
           </article>
         </div>
 
-        <article class="daily-metrics-card">
+        <article class="daily-metrics-card neon-metrics-card">
           <div class="meal-card-header">
             <div>
               <p class="meal-label">Indicadores diarios</p>
@@ -227,7 +227,7 @@
         </article>
       </section>
 
-      <section class="panel stats-panel">
+      <section class="panel stats-panel neon-summary-panel">
         <div class="panel-header">
           <div>
             <p class="panel-kicker">Resumen</p>
@@ -248,15 +248,15 @@
         </div>
 
         <div class="breakdown-grid">
-          <div class="mini-panel">
+          <div class="mini-panel neon-summary-mini">
             <h3>Indicadores por día</h3>
             <div id="daily-metrics-board" class="daily-metrics-board"></div>
           </div>
-          <div class="mini-panel">
+          <div class="mini-panel neon-summary-mini">
             <h3>Almuerzo vs cena</h3>
             <div id="meal-breakdown" class="mini-panel-body"></div>
           </div>
-          <div class="mini-panel">
+          <div class="mini-panel neon-summary-mini">
             <h3>Faltantes automáticos</h3>
             <div id="missing-summary" class="mini-panel-body"></div>
           </div>
