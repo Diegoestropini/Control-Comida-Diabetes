@@ -449,6 +449,10 @@ function renderInsights(insights) {
           <span>${insights.glucoseVariability.rangeDisplay}</span>
         </div>
         <div class="insight-line insight-line-detail">
+          <span>Glucosa media</span>
+          <span>${insights.glucoseVariability.averageDisplay}</span>
+        </div>
+        <div class="insight-line insight-line-detail">
           <span>Base del calculo</span>
           <span>${insights.glucoseVariability.basisLabel}</span>
         </div>
@@ -879,6 +883,8 @@ function computeInsightsSafely(records, dailyMetrics) {
       glucoseVariability: {
         deviation: null,
         deviationDisplay: "Sin datos",
+        average: null,
+        averageDisplay: "Sin datos",
         cv: null,
         cvDisplay: "Sin datos",
         rangeDisplay: "Sin datos",
@@ -1045,6 +1051,8 @@ function computeGlucoseVariability(metrics) {
     return {
       deviation: null,
       deviationDisplay: "Sin datos",
+      average: null,
+      averageDisplay: "Sin datos",
       cv: null,
       cvDisplay: "Sin datos",
       rangeDisplay: "Sin datos",
@@ -1074,6 +1082,8 @@ function computeGlucoseVariability(metrics) {
   return {
     deviation,
     deviationDisplay: `${deviation} mg/dL`,
+    average: avg,
+    averageDisplay: formatGlucose(avg),
     cv,
     cvDisplay: cv === null ? "Sin datos" : `${cv}%`,
     rangeDisplay: `${formatGlucose(min)} - ${formatGlucose(max)}`,
