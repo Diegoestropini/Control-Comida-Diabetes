@@ -24,6 +24,7 @@ const elements = {
   notice: document.getElementById("notice"),
   statsGrid: document.getElementById("stats-grid"),
   dailyMetricsSummary: document.getElementById("daily-metrics-summary"),
+  insightsGrid: document.getElementById("insights-grid"),
   dailyMetricsBoard: document.getElementById("daily-metrics-board"),
   timelineChart: document.getElementById("timeline-chart"),
   mealBreakdown: document.getElementById("meal-breakdown"),
@@ -327,6 +328,7 @@ function renderDailyMetricsForm() {
 function renderStats() {
   const stats = computeStats(state.records);
   const dailyMetricStats = computeDailyMetricStats(state.dailyMetrics);
+  const insights = computeInsightsSafely(state.records, state.dailyMetrics);
 
   elements.statsGrid.innerHTML = [
     createStatCard("Total de registros", String(stats.totalRecords)),
@@ -356,10 +358,136 @@ function renderStats() {
     ),
   ].join("");
 
+  renderInsights(insights);
   renderTimeline(stats.timeline);
-  renderMealBreakdown(stats.breakdownByMeal);
+  renderMealBreakdown(stats.breakdownByMeal, insights.mealComparison || createEmptyMealComparison());
   renderMissingSummary(stats.missingCount);
   renderDailyMetricsBoard(dailyMetricStats.sortedMetrics);
+}
+
+function renderInsights(insights) {
+  if (!elements.insightsGrid) {
+    return;
+  }
+
+  const weeklyMarkup = insights.weeklyComparison.hasComparison
+    ? `
+      <div class="insight-stack">
+        <div class="insight-line">
+          <span>Tiempo en rango</span>
+          <strong>${insights.weeklyComparison.currentTimeInRangeDisplay}</strong>
+        </div>
+        <div class="insight-line insight-line-detail">
+          <span>7 dias previos</span>
+          <span>${insights.weeklyComparison.previousTimeInRangeDisplay}</span>
+        </div>
+        <div class="insight-trend ${insights.weeklyComparison.timeInRangeDirection}">
+          ${insights.weeklyComparison.timeInRangeDeltaLabel}
+        </div>
+        <div class="insight-line">
+          <span>Glucosa media</span>
+          <strong>${insights.weeklyComparison.currentGlucoseDisplay}</strong>
+        </div>
+        <div class="insight-line insight-line-detail">
+          <span>7 dias previos</span>
+          <span>${insights.weeklyComparison.previousGlucoseDisplay}</span>
+        </div>
+        <div class="insight-trend ${insights.weeklyComparison.glucoseDirection}">
+          ${insights.weeklyComparison.glucoseDeltaLabel}
+        </div>
+      </div>
+    `
+    : '<div class="empty-state">Se necesitan al menos 14 indicadores diarios para comparar dos semanas completas.</div>';
+
+  elements.insightsGrid.innerHTML = `
+    <article class="mini-panel neon-summary-mini insight-panel">
+      <h3>Rachas de dias buenos</h3>
+      <div class="mini-panel-body">
+        <div class="insight-kpi-row">
+          <div class="insight-kpi">
+            <strong>${insights.streaks.greenDays}</strong>
+            <span>Dias seguidos con al menos un verde</span>
+          </div>
+          <div class="insight-kpi">
+            <strong>${insights.streaks.timeInRangeDays}</strong>
+            <span>Dias seguidos con TIR arriba de 70%</span>
+          </div>
+        </div>
+        <div class="insight-line insight-line-detail">
+          <span>Ultimo dia evaluado</span>
+          <span>${insights.streaks.lastTrackedDayLabel}</span>
+        </div>
+      </div>
+    </article>
+
+    <article class="mini-panel neon-summary-mini insight-panel">
+      <h3>Evolucion semanal</h3>
+      <div class="mini-panel-body">
+        ${weeklyMarkup}
+      </div>
+    </article>
+
+    <article class="mini-panel neon-summary-mini insight-panel insight-panel-wide insight-panel-variability insight-panel-variability-${insights.glucoseVariability.tone}">
+      <h3>Variabilidad de glucosa</h3>
+      <div class="mini-panel-body">
+        <div class="insight-kpi-row">
+          <div class="insight-kpi">
+            <strong>${insights.glucoseVariability.deviationDisplay}</strong>
+            <span>Desvio estandar</span>
+          </div>
+          <div class="insight-kpi">
+            <strong>${insights.glucoseVariability.rangeDisplay}</strong>
+            <span>Rango observado</span>
+          </div>
+        </div>
+        <div class="insight-line">
+          <span>Lectura</span>
+          <strong>${insights.glucoseVariability.levelLabel}</strong>
+        </div>
+        <div class="insight-line insight-line-detail">
+          <span>Ultimos valores</span>
+          <span>${insights.glucoseVariability.latestPairDisplay}</span>
+        </div>
+      </div>
+    </article>
+
+    <article class="mini-panel neon-summary-mini insight-panel insight-panel-day insight-panel-day-best">
+      <h3>Mejor dia de control</h3>
+      <div class="mini-panel-body">
+        ${renderControlDayHighlight(insights.controlHighlights.bestDay, "Todavia no hay indicadores diarios para detectar el mejor dia.")}
+      </div>
+    </article>
+
+    <article class="mini-panel neon-summary-mini insight-panel insight-panel-day insight-panel-day-worst">
+      <h3>Peor dia de control</h3>
+      <div class="mini-panel-body">
+        ${renderControlDayHighlight(insights.controlHighlights.worstDay, "Todavia no hay indicadores diarios para detectar el peor dia.")}
+      </div>
+    </article>
+  `;
+}
+
+function renderControlDayHighlight(day, emptyMessage) {
+  if (!day) {
+    return `<div class="empty-state">${emptyMessage}</div>`;
+  }
+
+  return `
+    <div class="insight-line">
+      <span>Fecha</span>
+      <strong>${formatDate(day.metricDate)}</strong>
+    </div>
+    <div class="insight-kpi-row">
+      <div class="insight-kpi">
+        <strong>${day.timeInRangeDisplay}</strong>
+        <span>Tiempo en rango</span>
+      </div>
+      <div class="insight-kpi">
+        <strong>${day.averageGlucoseDisplay}</strong>
+        <span>Glucosa media</span>
+      </div>
+    </div>
+  `;
 }
 
 function renderTimeline(timeline) {
@@ -392,15 +520,24 @@ function renderTimeline(timeline) {
   }).join("");
 }
 
-function renderMealBreakdown(breakdown) {
+function renderMealBreakdown(breakdown, mealComparison) {
   elements.mealBreakdown.innerHTML = ["lunch", "dinner"].map((mealType) => {
     const item = breakdown[mealType];
+    const comparison = mealComparison?.[mealType] || createMealComparisonBase();
+    const rankLabel = mealComparison.bestMeal === mealType
+      ? "Mejor franja"
+      : mealComparison.worstMeal === mealType
+        ? "Franja mas debil"
+        : "Sin diferencia clara";
+
     return `
       <div class="mini-line"><strong>${MEAL_LABELS[mealType]}</strong><span>${item.total} total</span></div>
+      <div class="mini-line"><span>Verde %</span><span>${comparison.greenRateLabel}</span></div>
       <div class="mini-line"><span>Pendiente</span><span>${item.pending}</span></div>
       <div class="mini-line"><span>Verde</span><span>${item.verde}</span></div>
       <div class="mini-line"><span>Amarillo</span><span>${item.amarillo}</span></div>
       <div class="mini-line"><span>Rojo</span><span>${item.rojo}</span></div>
+      <div class="mini-line"><span>Lectura</span><span>${rankLabel}</span></div>
     `;
   }).join("");
 }
@@ -633,6 +770,7 @@ function calculatePercentage(value, total) {
 function exportRecords() {
   const mealStats = computeStats(state.records);
   const dailyMetricStats = computeDailyMetricStats(state.dailyMetrics);
+  const insights = computeInsightsSafely(state.records, state.dailyMetrics);
   const payload = {
     exportedAt: new Date().toISOString(),
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -650,6 +788,12 @@ function exportRecords() {
         averageGlucose: dailyMetricStats.averageGlucose,
         inTargetDays: dailyMetricStats.inTargetDays,
         glucoseInTargetDays: dailyMetricStats.glucoseInTargetDays,
+      },
+      insights: {
+        streaks: insights.streaks,
+        mealComparison: insights.mealComparison,
+        weeklyComparison: insights.weeklyComparison.exportable,
+        glucoseVariability: insights.glucoseVariability.exportable,
       },
     },
     records: sortRecords(state.records).map((record) => ({
@@ -701,6 +845,353 @@ function sortRecords(records) {
   });
 }
 
+function computeInsights(records, dailyMetrics) {
+  return {
+    streaks: computeStreakInsights(records, dailyMetrics),
+    mealComparison: computeMealComparison(records),
+    weeklyComparison: computeWeeklyComparison(dailyMetrics),
+    glucoseVariability: computeGlucoseVariability(dailyMetrics),
+    controlHighlights: computeControlHighlights(dailyMetrics),
+  };
+}
+
+function computeInsightsSafely(records, dailyMetrics) {
+  try {
+    return computeInsights(records, dailyMetrics);
+  } catch (error) {
+    console.error("No se pudieron calcular los insights avanzados.", error);
+    return {
+      streaks: {
+        greenDays: 0,
+        timeInRangeDays: 0,
+        lastTrackedDay: null,
+        lastTrackedDayLabel: "Sin datos",
+      },
+      mealComparison: createEmptyMealComparison(),
+      weeklyComparison: {
+        hasComparison: false,
+        exportable: { hasComparison: false },
+      },
+      glucoseVariability: {
+        deviation: null,
+        deviationDisplay: "Sin datos",
+        rangeDisplay: "Sin datos",
+        minDisplay: "Sin datos",
+        maxDisplay: "Sin datos",
+        latestPairDisplay: "Sin datos",
+        levelLabel: "Sin datos disponibles",
+        tone: "neutral",
+        exportable: { deviation: null, min: null, max: null, range: null },
+      },
+      controlHighlights: {
+        bestDay: null,
+        worstDay: null,
+      },
+    };
+  }
+}
+
+function computeStreakInsights(records, dailyMetrics) {
+  const mealDays = getSortedUniqueDates(records.map((record) => record.recordDate));
+  const metricDays = getSortedUniqueDates(dailyMetrics.map((metric) => metric.metricDate));
+  const greenDays = new Set(
+    records
+      .filter((record) => record.status === "recorded" && record.tolerance === "verde")
+      .map((record) => record.recordDate)
+  );
+  const metricMap = new Map(dailyMetrics.map((metric) => [metric.metricDate, Number(metric.timeInRange)]));
+  const lastTrackedDay = mealDays[0] || metricDays[0] || null;
+
+  return {
+    greenDays: countConsecutiveDays(mealDays, (dateKey) => greenDays.has(dateKey)),
+    timeInRangeDays: countConsecutiveDays(metricDays, (dateKey) => (metricMap.get(dateKey) || 0) >= 70),
+    lastTrackedDay,
+    lastTrackedDayLabel: lastTrackedDay ? formatDate(lastTrackedDay) : "Sin datos",
+  };
+}
+
+function computeMealComparison(records) {
+  const base = createEmptyMealComparison();
+
+  records.forEach((record) => {
+    if (record.status === "missing" || !base[record.mealType]) {
+      return;
+    }
+
+    const meal = base[record.mealType];
+    meal.recorded += 1;
+
+    if (!record.tolerance) {
+      meal.pending += 1;
+      return;
+    }
+
+    meal.resolved += 1;
+    if (record.tolerance === "verde") {
+      meal.green += 1;
+    }
+    if (record.tolerance === "rojo") {
+      meal.red += 1;
+    }
+  });
+
+  ["lunch", "dinner"].forEach((mealType) => {
+    const meal = base[mealType];
+    meal.greenRate = meal.resolved ? roundMetric((meal.green / meal.resolved) * 100) : null;
+    meal.greenRateLabel = meal.greenRate === null ? "Sin datos" : `${meal.greenRate}%`;
+  });
+
+  const resolvedMeals = ["lunch", "dinner"].filter((mealType) => base[mealType].resolved > 0);
+  let bestMeal = null;
+  let worstMeal = null;
+
+  if (resolvedMeals.length === 2 && base.lunch.greenRate !== base.dinner.greenRate) {
+    bestMeal = base.lunch.greenRate > base.dinner.greenRate ? "lunch" : "dinner";
+    worstMeal = bestMeal === "lunch" ? "dinner" : "lunch";
+  }
+
+  return {
+    ...base,
+    bestMeal,
+    worstMeal,
+  };
+}
+
+function createMealComparisonBase() {
+  return {
+    recorded: 0,
+    pending: 0,
+    resolved: 0,
+    green: 0,
+    red: 0,
+    greenRate: null,
+    greenRateLabel: "Sin datos",
+  };
+}
+
+function createEmptyMealComparison() {
+  return {
+    lunch: createMealComparisonBase(),
+    dinner: createMealComparisonBase(),
+    bestMeal: null,
+    worstMeal: null,
+  };
+}
+
+function computeWeeklyComparison(metrics) {
+  const sortedMetrics = sortDailyMetrics(metrics).map((metric) => ({
+    ...metric,
+    timeInRange: Number(metric.timeInRange),
+    averageGlucose: Number(metric.averageGlucose),
+  }));
+  const currentWeek = sortedMetrics.slice(0, 7);
+  const previousWeek = sortedMetrics.slice(7, 14);
+  const hasComparison = currentWeek.length === 7 && previousWeek.length === 7;
+
+  if (!hasComparison) {
+    return {
+      hasComparison: false,
+      exportable: { hasComparison: false },
+    };
+  }
+
+  const currentTimeInRange = roundMetric(average(currentWeek.map((metric) => metric.timeInRange)));
+  const previousTimeInRange = roundMetric(average(previousWeek.map((metric) => metric.timeInRange)));
+  const currentGlucose = roundMetric(average(currentWeek.map((metric) => metric.averageGlucose)));
+  const previousGlucose = roundMetric(average(previousWeek.map((metric) => metric.averageGlucose)));
+
+  return {
+    hasComparison: true,
+    currentTimeInRange,
+    previousTimeInRange,
+    currentGlucose,
+    previousGlucose,
+    currentTimeInRangeDisplay: formatPercentage(currentTimeInRange),
+    previousTimeInRangeDisplay: formatPercentage(previousTimeInRange),
+    currentGlucoseDisplay: formatGlucose(currentGlucose),
+    previousGlucoseDisplay: formatGlucose(previousGlucose),
+    timeInRangeDirection: getDeltaDirection(currentTimeInRange - previousTimeInRange, true),
+    glucoseDirection: getDeltaDirection(previousGlucose - currentGlucose, true),
+    timeInRangeDeltaLabel: formatDeltaLabel(currentTimeInRange - previousTimeInRange, "TIR", "pts"),
+    glucoseDeltaLabel: formatDeltaLabel(previousGlucose - currentGlucose, "Glucosa", "mg/dL", true),
+    exportable: {
+      hasComparison: true,
+      currentTimeInRange,
+      previousTimeInRange,
+      currentGlucose,
+      previousGlucose,
+      timeInRangeDelta: roundMetric(currentTimeInRange - previousTimeInRange),
+      glucoseDelta: roundMetric(currentGlucose - previousGlucose),
+    },
+  };
+}
+
+function computeGlucoseVariability(metrics) {
+  const sortedMetrics = sortDailyMetrics(metrics)
+    .map((metric) => ({
+      ...metric,
+      averageGlucose: Number(metric.averageGlucose),
+    }))
+    .filter((metric) => Number.isFinite(metric.averageGlucose));
+  const values = sortedMetrics.map((metric) => metric.averageGlucose);
+
+  if (!values.length) {
+    return {
+      deviation: null,
+      deviationDisplay: "Sin datos",
+      rangeDisplay: "Sin datos",
+      minDisplay: "Sin datos",
+      maxDisplay: "Sin datos",
+      latestPairDisplay: "Sin datos",
+      levelLabel: "Todavia no hay indicadores diarios",
+      tone: "neutral",
+      exportable: { deviation: null, min: null, max: null, range: null },
+    };
+  }
+
+  const avg = average(values);
+  const variance = values.reduce((sum, value) => sum + ((value - avg) ** 2), 0) / values.length;
+  const deviation = roundMetric(Math.sqrt(variance));
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const latestValue = sortedMetrics[0]?.averageGlucose ?? null;
+  const previousValue = sortedMetrics[1]?.averageGlucose ?? null;
+  const range = latestValue !== null && previousValue !== null
+    ? roundMetric(Math.abs(latestValue - previousValue))
+    : 0;
+  const levelLabel = deviation <= 10 ? "Variacion baja" : deviation <= 20 ? "Variacion moderada" : "Variacion alta";
+  const tone = deviation <= 10 ? "good" : deviation <= 20 ? "warning" : "danger";
+
+  return {
+    deviation,
+    deviationDisplay: `${deviation} mg/dL`,
+    rangeDisplay: `${range} mg/dL`,
+    minDisplay: formatGlucose(min),
+    maxDisplay: formatGlucose(max),
+    latestPairDisplay: latestValue !== null && previousValue !== null
+      ? `${formatGlucose(latestValue)} / ${formatGlucose(previousValue)}`
+      : "Hace falta otro dia",
+    levelLabel,
+    tone,
+    exportable: {
+      deviation,
+      min,
+      max,
+      range,
+    },
+  };
+}
+
+function computeControlHighlights(metrics) {
+  const normalizedMetrics = sortDailyMetrics(metrics)
+    .map((metric) => ({
+      ...metric,
+      timeInRange: Number(metric.timeInRange),
+      averageGlucose: Number(metric.averageGlucose),
+    }))
+    .filter((metric) => Number.isFinite(metric.timeInRange) && Number.isFinite(metric.averageGlucose));
+
+  if (!normalizedMetrics.length) {
+    return {
+      bestDay: null,
+      worstDay: null,
+    };
+  }
+
+  const ranked = [...normalizedMetrics].sort((left, right) => {
+    const tirDiff = right.timeInRange - left.timeInRange;
+    if (tirDiff !== 0) {
+      return tirDiff;
+    }
+
+    const glucoseDiff = left.averageGlucose - right.averageGlucose;
+    if (glucoseDiff !== 0) {
+      return glucoseDiff;
+    }
+
+    return right.metricDate.localeCompare(left.metricDate);
+  });
+
+  return {
+    bestDay: formatControlDay(ranked[0]),
+    worstDay: formatControlDay(ranked[ranked.length - 1]),
+  };
+}
+
+function formatControlDay(metric) {
+  if (!metric) {
+    return null;
+  }
+
+  return {
+    metricDate: metric.metricDate,
+    timeInRange: metric.timeInRange,
+    averageGlucose: metric.averageGlucose,
+    timeInRangeDisplay: formatPercentage(metric.timeInRange),
+    averageGlucoseDisplay: formatGlucose(metric.averageGlucose),
+  };
+}
+
+function getSortedUniqueDates(dates) {
+  return [...new Set(dates)].sort((left, right) => right.localeCompare(left));
+}
+
+function countConsecutiveDays(sortedDates, predicate) {
+  if (!sortedDates.length) {
+    return 0;
+  }
+
+  let streak = 0;
+  let expectedDate = sortedDates[0];
+
+  for (const dateKey of sortedDates) {
+    if (dateKey !== expectedDate) {
+      break;
+    }
+
+    if (!predicate(dateKey)) {
+      break;
+    }
+
+    streak += 1;
+    expectedDate = getLocalDateKey(shiftDate(parseDateKey(expectedDate), -1));
+  }
+
+  return streak;
+}
+
+function average(values) {
+  if (!values.length) {
+    return 0;
+  }
+
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function formatDeltaLabel(delta, label, unit, invertGood = false) {
+  if (delta === 0) {
+    return `${label} sin cambios`;
+  }
+
+  const sign = delta > 0 ? "+" : "-";
+  const formatted = `${sign}${Math.abs(roundMetric(delta))} ${unit}`;
+  if (invertGood) {
+    return delta > 0 ? `${formatted} mejor` : `${formatted} peor`;
+  }
+
+  return delta > 0 ? `${formatted} mejor` : `${formatted} peor`;
+}
+
+function getDeltaDirection(delta, positiveIsGood) {
+  if (delta === 0) {
+    return "neutral";
+  }
+
+  const isPositive = delta > 0;
+  const isGood = positiveIsGood ? isPositive : !isPositive;
+  return isGood ? "positive" : "negative";
+}
+
 function upsertRecord(record) {
   const index = state.records.findIndex((item) => item.id === record.id);
   if (index >= 0) {
@@ -728,7 +1219,7 @@ function loadRecords() {
     }
 
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed) ? parsed.map(normalizeRecord).filter(Boolean) : [];
   } catch (error) {
     console.error("No se pudieron leer los datos guardados.", error);
     return [];
@@ -743,11 +1234,65 @@ function loadDailyMetrics() {
     }
 
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed) ? parsed.map(normalizeDailyMetric).filter(Boolean) : [];
   } catch (error) {
     console.error("No se pudieron leer los indicadores diarios guardados.", error);
     return [];
   }
+}
+
+function normalizeRecord(record) {
+  if (!record || typeof record !== "object") {
+    return null;
+  }
+
+  const mealType = record.mealType === "lunch" || record.mealType === "dinner" ? record.mealType : null;
+  const recordDate = typeof record.recordDate === "string" ? record.recordDate : null;
+  const scheduledTime = typeof record.scheduledTime === "string" ? record.scheduledTime : (mealType ? DEFAULT_TIMES[mealType] : "00:00");
+  const status = record.status === "missing" ? "missing" : "recorded";
+  const tolerance = ["verde", "amarillo", "rojo"].includes(record.tolerance) ? record.tolerance : null;
+  const nowIso = new Date().toISOString();
+
+  if (!mealType || !recordDate) {
+    return null;
+  }
+
+  return {
+    id: typeof record.id === "string" ? record.id : createRecordId(),
+    mealType,
+    mealText: typeof record.mealText === "string" ? record.mealText : "",
+    tolerance,
+    toleranceUpdatedAt: typeof record.toleranceUpdatedAt === "string" ? record.toleranceUpdatedAt : null,
+    scheduledTime,
+    recordDate,
+    createdAt: typeof record.createdAt === "string" ? record.createdAt : nowIso,
+    updatedAt: typeof record.updatedAt === "string" ? record.updatedAt : nowIso,
+    status,
+  };
+}
+
+function normalizeDailyMetric(metric) {
+  if (!metric || typeof metric !== "object") {
+    return null;
+  }
+
+  const metricDate = typeof metric.metricDate === "string" ? metric.metricDate : null;
+  const timeInRange = Number(metric.timeInRange);
+  const averageGlucose = Number(metric.averageGlucose);
+  const nowIso = new Date().toISOString();
+
+  if (!metricDate || !Number.isFinite(timeInRange) || !Number.isFinite(averageGlucose)) {
+    return null;
+  }
+
+  return {
+    id: typeof metric.id === "string" ? metric.id : createMetricId(),
+    metricDate,
+    timeInRange,
+    averageGlucose,
+    createdAt: typeof metric.createdAt === "string" ? metric.createdAt : nowIso,
+    updatedAt: typeof metric.updatedAt === "string" ? metric.updatedAt : nowIso,
+  };
 }
 
 function persistRecords() {
