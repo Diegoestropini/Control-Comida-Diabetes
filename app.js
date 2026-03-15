@@ -125,8 +125,14 @@ function bindEvents() {
 
   elements.exportButton.addEventListener("click", exportRecords);
   elements.forceCloseButton.addEventListener("click", () => {
-    runDailyClosure({ forceDateKey: getLocalDateKey(new Date()) });
-    setNotice("Se ejecutó el cierre diario manualmente para hoy.");
+    const closureResult = runDailyClosure({ forceDateKey: getLocalDateKey(new Date()) });
+    if (!closureResult.touchedDates.length) {
+      setNotice("Todavía no vencieron horarios de comida para cerrar hoy.");
+    } else if (closureResult.createdCount > 0) {
+      setNotice(`Se ejecutó el cierre manual para hoy y se marcaron ${closureResult.createdCount} faltante(s) vencido(s).`);
+    } else {
+      setNotice("Se ejecutó el cierre manual para hoy. No había faltantes vencidos para crear.");
+    }
     render();
   });
 
@@ -185,7 +191,7 @@ function saveTolerance(mealType) {
   const now = new Date();
   const editingRecordId = form.dataset.editingRecordId || "";
   const editingRecord = editingRecordId ? findRecordById(editingRecordId) : null;
-  const recordDate = editingRecord?.recordDate || getLocalDateKey(now);
+  const recordDate = editingRecord?.recordDate || getActiveMealRecordDate(mealType) || getLocalDateKey(now);
   const record = editingRecord || findRecordForDate(recordDate, mealType);
 
   if (!record) {
@@ -214,19 +220,31 @@ function runDailyClosure(options = {}) {
   const previousDay = shiftDate(now, -1);
   const lastClosure = localStorage.getItem(CLOSURE_KEY);
   const endKey = options.forceDateKey || getLocalDateKey(previousDay);
+  const todayKey = getLocalDateKey(now);
+  const isManualTodayClosure = options.forceDateKey === todayKey;
 
   if (!options.forceDateKey && lastClosure === endKey) {
-    return;
+    return { createdCount: 0, skippedFutureMeals: 0, touchedDates: [] };
   }
 
   const datesToClose = collectDatesToClose(lastClosure, endKey);
   if (!datesToClose.length) {
-    return;
+    return { createdCount: 0, skippedFutureMeals: 0, touchedDates: [] };
   }
 
   let changed = false;
+  let createdCount = 0;
+  let skippedFutureMeals = 0;
+  const touchedDates = [];
   datesToClose.forEach((dateKey) => {
-    ["lunch", "dinner"].forEach((mealType) => {
+    const eligibleMeals = getMealsEligibleForClosure(dateKey, now, options);
+    skippedFutureMeals += Object.keys(DEFAULT_TIMES).length - eligibleMeals.length;
+
+    if (eligibleMeals.length) {
+      touchedDates.push(dateKey);
+    }
+
+    eligibleMeals.forEach((mealType) => {
       if (findRecordForDate(dateKey, mealType)) {
         return;
       }
@@ -245,13 +263,18 @@ function runDailyClosure(options = {}) {
         status: "missing",
       });
       changed = true;
+      createdCount += 1;
     });
   });
 
-  localStorage.setItem(CLOSURE_KEY, endKey);
+  if (!isManualTodayClosure) {
+    localStorage.setItem(CLOSURE_KEY, endKey);
+  }
   if (changed) {
     persistRecords();
   }
+
+  return { createdCount, skippedFutureMeals, touchedDates };
 }
 
 function render() {
@@ -419,7 +442,7 @@ function renderInsights(insights, dailyMetrics) {
         </div>
       </div>
     `
-    : '<div class="empty-state">Se necesitan al menos 14 indicadores diarios para comparar dos semanas completas.</div>';
+    : '<div class="empty-state">Se necesitan 14 indicadores diarios consecutivos para comparar dos semanas reales.</div>';
 
   elements.insightsGrid.innerHTML = `
     <article class="mini-panel neon-summary-mini insight-panel">
@@ -1045,9 +1068,8 @@ function computeWeeklyComparison(metrics) {
     timeInRange: Number(metric.timeInRange),
     averageGlucose: Number(metric.averageGlucose),
   }));
-  const currentWeek = sortedMetrics.slice(0, 7);
-  const previousWeek = sortedMetrics.slice(7, 14);
-  const hasComparison = currentWeek.length === 7 && previousWeek.length === 7;
+  const consecutiveWindow = getLatestConsecutiveMetricWindow(sortedMetrics, 14);
+  const hasComparison = consecutiveWindow.length === 14;
 
   if (!hasComparison) {
     return {
@@ -1055,6 +1077,9 @@ function computeWeeklyComparison(metrics) {
       exportable: { hasComparison: false },
     };
   }
+
+  const currentWeek = consecutiveWindow.slice(0, 7);
+  const previousWeek = consecutiveWindow.slice(7, 14);
 
   const currentTimeInRange = roundMetric(average(currentWeek.map((metric) => metric.timeInRange)));
   const previousTimeInRange = roundMetric(average(previousWeek.map((metric) => metric.timeInRange)));
@@ -1375,6 +1400,26 @@ function average(values) {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
+function getLatestConsecutiveMetricWindow(metrics, requiredLength) {
+  if (metrics.length < requiredLength) {
+    return [];
+  }
+
+  const window = [metrics[0]];
+
+  for (let index = 1; index < metrics.length && window.length < requiredLength; index += 1) {
+    const previousDate = parseDateKey(window[window.length - 1].metricDate);
+    const expectedDate = getLocalDateKey(shiftDate(previousDate, -1));
+    if (metrics[index].metricDate !== expectedDate) {
+      break;
+    }
+
+    window.push(metrics[index]);
+  }
+
+  return window.length === requiredLength ? window : [];
+}
+
 function formatDeltaLabel(delta, label, unit, invertGood = false) {
   if (delta === 0) {
     return `${label} sin cambios`;
@@ -1519,6 +1564,15 @@ function clearEditState(form) {
   delete form.dataset.editingRecordId;
 }
 
+function getActiveMealRecordDate(mealType) {
+  const form = elements.forms[mealType];
+  if (!form) {
+    return "";
+  }
+
+  return form.elements.recordDate.value || "";
+}
+
 function renderTolerancePill(record) {
   if (record.status === "missing") {
     return '<span class="pill missing">No registró nada</span>';
@@ -1595,6 +1649,16 @@ function shiftDate(date, days) {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
   return next;
+}
+
+function getMealsEligibleForClosure(dateKey, referenceDate, options = {}) {
+  if (options.forceDateKey && options.forceDateKey !== getLocalDateKey(referenceDate)) {
+    return Object.keys(DEFAULT_TIMES);
+  }
+
+  return Object.keys(DEFAULT_TIMES).filter((mealType) => (
+    combineLocalDateAndTime(dateKey, DEFAULT_TIMES[mealType]) <= referenceDate
+  ));
 }
 
 function collectDatesToClose(lastClosureKey, endKey) {
