@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Control Alimentario Diabético</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Registro diario</p>
+        <h1>Almuerzos, cenas y tolerancia alimentaria</h1>
+        <p class="hero-text">
+          Registrá la comida completa, la tolerancia observada y dejá los datos listos para análisis futuros.
+        </p>
+      </div>
+      <div class="hero-actions">
+        <button id="quick-entry-button" class="action-button primary" type="button">Registro rapido</button>
+        <button id="export-button" class="action-button secondary" type="button">Exportar JSON</button>
+        <button id="force-close-button" class="action-button ghost" type="button">Cerrar día ahora</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel form-panel">
+        <div class="panel-header">
+          <div>
+            <p class="panel-kicker">Carga diaria</p>
+            <h2>Registrar comida</h2>
+          </div>
+          <div class="today-chip">
+            <span>Fecha local</span>
+            <strong id="today-label"></strong>
+          </div>
+        </div>
+
+        <div id="notice" class="notice" aria-live="polite"></div>
+
+        <div class="meal-grid">
+          <article class="meal-card">
+            <div class="meal-card-header">
+              <div>
+                <p class="meal-label">Almuerzo</p>
+                <h3>Horario base 13:30</h3>
+              </div>
+              <span class="meal-badge lunch">13:30</span>
+            </div>
+
+            <form class="meal-form" data-meal-form="lunch">
+              <label>
+                <span>Fecha del registro</span>
+                <input name="recordDate" type="date" required>
+              </label>
+
+              <label>
+                <span>Hora programada</span>
+                <input name="scheduledTime" type="time" value="13:30" required>
+              </label>
+
+              <label>
+                <span>Comida completa</span>
+                <textarea name="mealText" rows="5" placeholder="Ejemplo: Pollo al horno con arroz, ensalada de tomate y una manzana"></textarea>
+              </label>
+
+              <label class="missing-toggle">
+                <input name="markMissing" type="checkbox">
+                <span>Marcar como “no registró nada”</span>
+              </label>
+
+              <div class="form-meta">
+                <p class="hint" data-form-meta="lunch">Se guardará con la fecha y hora local exacta del registro.</p>
+                <div class="form-actions">
+                  <button class="action-button ghost" data-cancel-edit="lunch" type="button">Cancelar</button>
+                  <button class="action-button primary" type="submit">Guardar almuerzo</button>
+                </div>
+              </div>
+            </form>
+
+            <form class="tolerance-form" data-tolerance-form="lunch">
+              <div class="subsection-header">
+                <h4>Registrar tolerancia después</h4>
+                <p class="hint" data-tolerance-meta="lunch">Primero guardá la comida. La tolerancia puede quedar pendiente.</p>
+              </div>
+
+              <fieldset class="tolerance-fieldset">
+                <legend>Tolerancia</legend>
+                <div class="tolerance-options">
+                  <label class="tolerance-option green">
+                    <input type="radio" name="tolerance" value="verde" checked>
+                    <span>Verde</span>
+                  </label>
+                  <label class="tolerance-option yellow">
+                    <input type="radio" name="tolerance" value="amarillo">
+                    <span>Amarillo</span>
+                  </label>
+                  <label class="tolerance-option red">
+                    <input type="radio" name="tolerance" value="rojo">
+                    <span>Rojo</span>
+                  </label>
+                </div>
+              </fieldset>
+
+              <div class="form-meta">
+                <p class="hint">Se actualiza el mismo registro, sin duplicarlo.</p>
+                <div class="form-actions">
+                  <button class="action-button ghost" data-cancel-tolerance-edit="lunch" type="button">Cancelar</button>
+                  <button class="action-button ghost" type="submit">Guardar tolerancia</button>
+                </div>
+              </div>
+            </form>
+          </article>
+
+          <article class="meal-card">
+            <div class="meal-card-header">
+              <div>
+                <p class="meal-label">Cena</p>
+                <h3>Horario base 21:30</h3>
+              </div>
+              <span class="meal-badge dinner">21:30</span>
+            </div>
+
+            <form class="meal-form" data-meal-form="dinner">
+              <label>
+                <span>Fecha del registro</span>
+                <input name="recordDate" type="date" required>
+              </label>
+
+              <label>
+                <span>Hora programada</span>
+                <input name="scheduledTime" type="time" value="21:30" required>
+              </label>
+
+              <label>
+                <span>Comida completa</span>
+                <textarea name="mealText" rows="5" placeholder="Ejemplo: Sopa de verduras, pescado a la plancha y yogur natural"></textarea>
+              </label>
+
+              <label class="missing-toggle">
+                <input name="markMissing" type="checkbox">
+                <span>Marcar como “no registró nada”</span>
+              </label>
+
+              <div class="form-meta">
+                <p class="hint" data-form-meta="dinner">El registro se puede editar más adelante sin generar duplicados.</p>
+                <div class="form-actions">
+                  <button class="action-button ghost" data-cancel-edit="dinner" type="button">Cancelar</button>
+                  <button class="action-button primary" type="submit">Guardar cena</button>
+                </div>
+              </div>
+            </form>
+
+            <form class="tolerance-form" data-tolerance-form="dinner">
+              <div class="subsection-header">
+                <h4>Registrar tolerancia después</h4>
+                <p class="hint" data-tolerance-meta="dinner">Primero guardá la comida. La tolerancia puede quedar pendiente.</p>
+              </div>
+
+              <fieldset class="tolerance-fieldset">
+                <legend>Tolerancia</legend>
+                <div class="tolerance-options">
+                  <label class="tolerance-option green">
+                    <input type="radio" name="tolerance" value="verde" checked>
+                    <span>Verde</span>
+                  </label>
+                  <label class="tolerance-option yellow">
+                    <input type="radio" name="tolerance" value="amarillo">
+                    <span>Amarillo</span>
+                  </label>
+                  <label class="tolerance-option red">
+                    <input type="radio" name="tolerance" value="rojo">
+                    <span>Rojo</span>
+                  </label>
+                </div>
+              </fieldset>
+
+              <div class="form-meta">
+                <p class="hint">Se actualiza el mismo registro, sin duplicarlo.</p>
+                <div class="form-actions">
+                  <button class="action-button ghost" data-cancel-tolerance-edit="dinner" type="button">Cancelar</button>
+                  <button class="action-button ghost" type="submit">Guardar tolerancia</button>
+                </div>
+              </div>
+            </form>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel stats-panel">
+        <div class="panel-header">
+          <div>
+            <p class="panel-kicker">Resumen</p>
+            <h2>Estadísticas</h2>
+          </div>
+        </div>
+
+        <div class="stats-grid" id="stats-grid"></div>
+
+        <div class="chart-panel">
+          <div class="chart-header">
+            <h3>Tendencia cronológica</h3>
+            <p>Últimos días con registros cargados.</p>
+          </div>
+          <div id="timeline-chart" class="timeline-chart"></div>
+        </div>
+
+        <div class="breakdown-grid">
+          <div class="mini-panel">
+            <h3>Almuerzo vs cena</h3>
+            <div id="meal-breakdown" class="mini-panel-body"></div>
+          </div>
+          <div class="mini-panel">
+            <h3>Faltantes automáticos</h3>
+            <div id="missing-summary" class="mini-panel-body"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel history-panel">
+        <div class="panel-header history-header">
+          <div>
+            <p class="panel-kicker">Seguimiento</p>
+            <h2>Historial cronológico</h2>
+          </div>
+          <div class="history-filters">
+            <label>
+              <span>Desde</span>
+              <input id="filter-from" type="date">
+            </label>
+            <label>
+              <span>Hasta</span>
+              <input id="filter-to" type="date">
+            </label>
+            <label>
+              <span>Tolerancia</span>
+              <select id="filter-tolerance">
+                <option value="all">Todas</option>
+                <option value="verde">Verde</option>
+                <option value="amarillo">Amarillo</option>
+                <option value="rojo">Rojo</option>
+                <option value="pending">Pendiente</option>
+                <option value="missing">No registró nada</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div class="history-table-shell">
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Comida</th>
+                <th>Hora programada</th>
+                <th>Hora de carga</th>
+                <th>Tolerancia</th>
+                <th>Detalle</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody id="history-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <template id="history-row-template">
+    <tr>
+      <td data-cell="date"></td>
+      <td data-cell="mealType"></td>
+      <td data-cell="scheduledTime"></td>
+      <td data-cell="createdAt"></td>
+      <td data-cell="tolerance"></td>
+      <td data-cell="detail"></td>
+      <td>
+        <div class="table-actions">
+          <button class="table-action" data-action="edit-meal" type="button">Comida</button>
+          <button class="table-action" data-action="edit-tolerance" type="button">Tolerancia</button>
+        </div>
+      </td>
+    </tr>
+  </template>
+
+  <div id="record-modal" class="modal-shell" hidden>
+    <div class="modal-backdrop" data-close-modal="true"></div>
+    <section class="modal-card" aria-modal="true" role="dialog" aria-labelledby="modal-title">
+      <div class="modal-header">
+        <div>
+          <p class="panel-kicker">Edicion rapida</p>
+          <h3 id="modal-title">Registro de comida</h3>
+        </div>
+        <button id="modal-close-button" class="table-action" type="button">Cerrar</button>
+      </div>
+
+      <div id="modal-notice" class="notice" aria-live="polite"></div>
+
+      <form id="modal-meal-form" class="modal-form">
+        <div class="modal-grid">
+          <label>
+            <span>Fecha</span>
+            <input name="recordDate" type="date" required>
+          </label>
+          <label>
+            <span>Comida</span>
+            <select name="mealType">
+              <option value="lunch">Almuerzo</option>
+              <option value="dinner">Cena</option>
+            </select>
+          </label>
+        </div>
+
+        <label>
+          <span>Hora programada</span>
+          <input name="scheduledTime" type="time" required>
+        </label>
+
+        <label>
+          <span>Comida completa</span>
+          <textarea name="mealText" rows="4" placeholder="Carga la comida completa aqui"></textarea>
+        </label>
+
+        <label class="missing-toggle">
+          <input name="markMissing" type="checkbox">
+          <span>Marcar como "no registro nada"</span>
+        </label>
+
+        <div class="form-meta">
+          <p class="hint" id="modal-meal-meta">Podes completar o corregir registros viejos desde esta ventana.</p>
+          <button class="action-button primary" type="submit">Guardar comida</button>
+        </div>
+      </form>
+
+      <form id="modal-tolerance-form" class="modal-form">
+        <div class="subsection-header">
+          <h4>Tolerancia</h4>
+          <p class="hint" id="modal-tolerance-meta">Podes registrar la tolerancia mas tarde sobre el mismo registro.</p>
+        </div>
+
+        <fieldset class="tolerance-fieldset">
+          <legend>Tolerancia</legend>
+          <div class="tolerance-options">
+            <label class="tolerance-option green">
+              <input type="radio" name="tolerance" value="verde" checked>
+              <span>Verde</span>
+            </label>
+            <label class="tolerance-option yellow">
+              <input type="radio" name="tolerance" value="amarillo">
+              <span>Amarillo</span>
+            </label>
+            <label class="tolerance-option red">
+              <input type="radio" name="tolerance" value="rojo">
+              <span>Rojo</span>
+            </label>
+          </div>
+        </fieldset>
+
+        <div class="form-meta">
+          <p class="hint">No genera duplicados; actualiza el mismo registro.</p>
+          <button class="action-button ghost" type="submit">Guardar tolerancia</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
