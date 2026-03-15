@@ -676,6 +676,20 @@ textarea {
   line-height: 1.4;
 }
 
+.insight-a1c-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 0 18px rgba(6, 17, 29, 0.16);
+}
+
 .insight-panel-variability-good {
   background:
     radial-gradient(circle at top right, rgba(125, 245, 191, 0.2), transparent 34%),

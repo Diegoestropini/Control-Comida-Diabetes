@@ -453,6 +453,12 @@ function renderInsights(insights) {
           <span>${insights.glucoseVariability.averageDisplay}</span>
         </div>
         <div class="insight-line insight-line-detail">
+          <span>HbA1c aproximada</span>
+          <span class="insight-a1c-pill" style="background:${insights.glucoseVariability.estimatedA1cTone.background};color:${insights.glucoseVariability.estimatedA1cTone.color};">
+            ${insights.glucoseVariability.estimatedA1cDisplay}
+          </span>
+        </div>
+        <div class="insight-line insight-line-detail">
           <span>Base del calculo</span>
           <span>${insights.glucoseVariability.basisLabel}</span>
         </div>
@@ -888,6 +894,9 @@ function computeInsightsSafely(records, dailyMetrics) {
         deviationDisplay: "Sin datos",
         average: null,
         averageDisplay: "Sin datos",
+        estimatedA1c: null,
+        estimatedA1cDisplay: "Sin datos",
+        estimatedA1cTone: { background: "rgba(148, 163, 184, 0.18)", color: "#e2e8f0" },
         cv: null,
         cvDisplay: "Sin datos",
         rangeDisplay: "Sin datos",
@@ -896,7 +905,7 @@ function computeInsightsSafely(records, dailyMetrics) {
         basisLabel: "Sin datos disponibles",
         levelLabel: "Sin datos disponibles",
         tone: "neutral",
-        exportable: { deviation: null, cv: null, min: null, max: null, range: null },
+        exportable: { deviation: null, cv: null, min: null, max: null, range: null, estimatedA1c: null },
       },
       controlHighlights: {
         bestDay: null,
@@ -1056,6 +1065,9 @@ function computeGlucoseVariability(metrics) {
       deviationDisplay: "Sin datos",
       average: null,
       averageDisplay: "Sin datos",
+      estimatedA1c: null,
+      estimatedA1cDisplay: "Sin datos",
+      estimatedA1cTone: { background: "rgba(148, 163, 184, 0.18)", color: "#e2e8f0" },
       cv: null,
       cvDisplay: "Sin datos",
       rangeDisplay: "Sin datos",
@@ -1065,7 +1077,7 @@ function computeGlucoseVariability(metrics) {
       levelLabel: "Todavia no hay indicadores diarios",
       summaryLabel: "Cargá indicadores diarios para ver una lectura simple del promedio y la estabilidad.",
       tone: "neutral",
-      exportable: { deviation: null, cv: null, min: null, max: null, range: null },
+      exportable: { deviation: null, cv: null, min: null, max: null, range: null, estimatedA1c: null },
     };
   }
 
@@ -1073,6 +1085,7 @@ function computeGlucoseVariability(metrics) {
   const variance = values.reduce((sum, value) => sum + ((value - avg) ** 2), 0) / values.length;
   const deviation = roundMetric(Math.sqrt(variance));
   const cv = avg > 0 ? roundMetric((deviation / avg) * 100) : null;
+  const estimatedA1c = estimateA1cFromAverageGlucose(avg);
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = roundMetric(max - min);
@@ -1083,6 +1096,9 @@ function computeGlucoseVariability(metrics) {
     deviationDisplay: `${deviation} mg/dL`,
     average: avg,
     averageDisplay: formatGlucose(avg),
+    estimatedA1c,
+    estimatedA1cDisplay: formatEstimatedA1c(estimatedA1c),
+    estimatedA1cTone: getEstimatedA1cTone(estimatedA1c),
     cv,
     cvDisplay: cv === null ? "Sin datos" : `${cv}%`,
     rangeDisplay: `${formatGlucose(min)} - ${formatGlucose(max)}`,
@@ -1098,6 +1114,7 @@ function computeGlucoseVariability(metrics) {
       min,
       max,
       range,
+      estimatedA1c,
     },
   };
 }
@@ -2256,6 +2273,18 @@ function formatGlucose(value) {
   return `${roundMetric(value)} mg/dL`;
 }
 
+function estimateA1cFromAverageGlucose(value) {
+  if (!Number.isFinite(value)) {
+    return null;
+  }
+
+  return roundMetric((value + 46.7) / 28.7);
+}
+
+function formatEstimatedA1c(value) {
+  return Number.isFinite(value) ? `${roundMetric(value)}%` : "Sin datos";
+}
+
 function getTimeInRangeTone(value) {
   if (!Number.isFinite(value)) {
     return { background: "rgba(148, 163, 184, 0.7)", color: "#06111d" };
@@ -2289,6 +2318,24 @@ function getAverageGlucoseTone(value) {
           { value: 180, color: "#f97316" },
           { value: 240, color: "#dc2626" },
         ]);
+
+  return { background, color: getReadableTextColor(background) };
+}
+
+function getEstimatedA1cTone(value) {
+  if (!Number.isFinite(value)) {
+    return { background: "rgba(148, 163, 184, 0.18)", color: "#e2e8f0" };
+  }
+
+  const background = value <= 7
+    ? interpolateColor(Math.max(value, 5), 5, 7, "#166534", "#8fefad")
+    : interpolateMultiStop(Math.min(value, 12), [
+        { value: 7, color: "#8fefad" },
+        { value: 8, color: "#facc15" },
+        { value: 9, color: "#f97316" },
+        { value: 10, color: "#ef4444" },
+        { value: 12, color: "#991b1b" },
+      ]);
 
   return { background, color: getReadableTextColor(background) };
 }
