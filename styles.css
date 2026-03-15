@@ -604,6 +604,12 @@ textarea {
   overflow-x: auto;
 }
 
+.history-more-shell {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+}
+
 .history-table {
   width: 100%;
   border-collapse: collapse;
@@ -669,6 +675,21 @@ textarea {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.history-metric-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.history-metric-pill-empty {
+  background: rgba(148, 163, 184, 0.16);
+  color: #c3cfdf;
 }
 
 .modal-shell {

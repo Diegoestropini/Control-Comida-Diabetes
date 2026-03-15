@@ -16,6 +16,7 @@ const state = {
   records: loadRecords(),
   dailyMetrics: loadDailyMetrics(),
   showAllDailyMetrics: false,
+  showAllHistory: false,
 };
 
 const elements = {
@@ -28,6 +29,7 @@ const elements = {
   mealBreakdown: document.getElementById("meal-breakdown"),
   missingSummary: document.getElementById("missing-summary"),
   historyBody: document.getElementById("history-body"),
+  historyMoreShell: document.getElementById("history-more-shell"),
   exportButton: document.getElementById("export-button"),
   forceCloseButton: document.getElementById("force-close-button"),
   dailyMetricsForm: document.getElementById("daily-metrics-form"),
@@ -441,6 +443,7 @@ function renderDailyMetricsBoard(metrics) {
           </div>
           <div class="metric-day-actions">
             <button class="table-action" data-action="edit-daily-metric" data-metric-id="${metric.id}" type="button">Editar</button>
+            <button class="table-action" data-action="delete-daily-metric" data-metric-id="${metric.id}" type="button">Borrar</button>
           </div>
         </div>
         <div class="metric-chip-grid">
@@ -466,6 +469,24 @@ function renderDailyMetricsBoard(metrics) {
     });
   });
 
+  elements.dailyMetricsBoard.querySelectorAll('[data-action="delete-daily-metric"]').forEach((button) => {
+    button.addEventListener("click", () => {
+      const metric = findDailyMetricById(button.dataset.metricId);
+      if (!metric) {
+        return;
+      }
+
+      const confirmed = window.confirm(`Seguro que queres borrar los indicadores diarios del ${formatDate(metric.metricDate)}? Esta accion no se puede deshacer.`);
+      if (!confirmed) {
+        return;
+      }
+
+      removeDailyMetric(metric.id);
+      setNotice(`Indicadores diarios borrados para ${formatDate(metric.metricDate)}.`);
+      render();
+    });
+  });
+
   const toggleButton = elements.dailyMetricsBoard.querySelector('[data-action="toggle-daily-metrics"]');
   if (toggleButton) {
     toggleButton.addEventListener("click", () => {
@@ -473,29 +494,6 @@ function renderDailyMetricsBoard(metrics) {
       renderStats();
     });
   }
-}
-
-function renderHistory() {
-  const records = sortRecords(getFilteredRecords());
-  elements.historyBody.innerHTML = "";
-
-  if (!records.length) {
-    elements.historyBody.innerHTML = '<tr><td colspan="7" class="empty-state">No hay registros con los filtros actuales.</td></tr>';
-    return;
-  }
-
-  records.forEach((record) => {
-    const row = elements.historyTemplate.content.firstElementChild.cloneNode(true);
-    row.querySelector('[data-cell="date"]').textContent = formatDate(record.recordDate);
-    row.querySelector('[data-cell="mealType"]').textContent = MEAL_LABELS[record.mealType];
-    row.querySelector('[data-cell="scheduledTime"]').textContent = record.scheduledTime;
-    row.querySelector('[data-cell="createdAt"]').textContent = formatDateTime(record.createdAt);
-    row.querySelector('[data-cell="tolerance"]').innerHTML = renderTolerancePill(record);
-    row.querySelector('[data-cell="detail"]').textContent = record.mealText;
-    row.querySelector('[data-action="edit-meal"]').addEventListener("click", () => populateFormForEdit(record));
-    row.querySelector('[data-action="edit-tolerance"]').addEventListener("click", () => populateToleranceForm(record));
-    elements.historyBody.appendChild(row);
-  });
 }
 
 function getFilteredRecords() {
@@ -1190,26 +1188,41 @@ function bindEvents() {
   });
 
   [elements.filterFrom, elements.filterTo, elements.filterTolerance].forEach((control) => {
-    control.addEventListener("input", renderHistory);
+    control.addEventListener("input", () => {
+      state.showAllHistory = false;
+      renderHistory();
+    });
   });
 }
 
 function renderHistory() {
   const records = sortRecords(getFilteredRecords());
   elements.historyBody.innerHTML = "";
+  elements.historyMoreShell.innerHTML = "";
 
   if (!records.length) {
-    elements.historyBody.innerHTML = '<tr><td colspan="7" class="empty-state">No hay registros con los filtros actuales.</td></tr>';
+    elements.historyBody.innerHTML = '<tr><td colspan="9" class="empty-state">No hay registros con los filtros actuales.</td></tr>';
     return;
   }
 
-  records.forEach((record) => {
+  const visibleRecords = getVisibleHistoryRecords(records);
+
+  visibleRecords.forEach((record) => {
+    const dailyMetric = findDailyMetricByDate(record.recordDate);
     const row = elements.historyTemplate.content.firstElementChild.cloneNode(true);
     row.querySelector('[data-cell="date"]').textContent = formatDate(record.recordDate);
     row.querySelector('[data-cell="mealType"]').textContent = MEAL_LABELS[record.mealType];
     row.querySelector('[data-cell="scheduledTime"]').textContent = record.scheduledTime;
     row.querySelector('[data-cell="createdAt"]').textContent = formatDateTime(record.createdAt);
     row.querySelector('[data-cell="tolerance"]').innerHTML = renderTolerancePill(record);
+    row.querySelector('[data-cell="timeInRange"]').innerHTML = renderHistoryMetricPill(
+      dailyMetric ? formatPercentage(dailyMetric.timeInRange) : "Sin dato",
+      dailyMetric ? getTimeInRangeTone(dailyMetric.timeInRange) : null
+    );
+    row.querySelector('[data-cell="averageGlucose"]').innerHTML = renderHistoryMetricPill(
+      dailyMetric ? formatGlucose(dailyMetric.averageGlucose) : "Sin dato",
+      dailyMetric ? getAverageGlucoseTone(dailyMetric.averageGlucose) : null
+    );
     row.querySelector('[data-cell="detail"]').textContent = record.mealText;
     row.querySelector('[data-action="edit-meal"]').addEventListener("click", () => {
       openRecordModal({ record, section: "meal" });
@@ -1219,6 +1232,55 @@ function renderHistory() {
     });
     elements.historyBody.appendChild(row);
   });
+
+  renderHistoryMoreButton(records, visibleRecords);
+}
+
+function getVisibleHistoryRecords(records) {
+  if (state.showAllHistory) {
+    return records;
+  }
+
+  const visibleDateKeys = new Set();
+
+  return records.filter((record) => {
+    if (visibleDateKeys.has(record.recordDate)) {
+      return true;
+    }
+
+    if (visibleDateKeys.size < 2) {
+      visibleDateKeys.add(record.recordDate);
+      return true;
+    }
+
+    return false;
+  });
+}
+
+function renderHistoryMoreButton(records, visibleRecords) {
+  const hiddenCount = records.length - visibleRecords.length;
+  if (hiddenCount <= 0) {
+    return;
+  }
+
+  elements.historyMoreShell.innerHTML = `
+    <button class="table-action" data-action="toggle-history" type="button">
+      ${state.showAllHistory ? "Mostrar menos" : `Ver mas (${hiddenCount} registros)`}
+    </button>
+  `;
+
+  elements.historyMoreShell.querySelector('[data-action="toggle-history"]').addEventListener("click", () => {
+    state.showAllHistory = !state.showAllHistory;
+    renderHistory();
+  });
+}
+
+function renderHistoryMetricPill(label, tone) {
+  if (!tone) {
+    return '<span class="history-metric-pill history-metric-pill-empty">Sin dato</span>';
+  }
+
+  return `<span class="history-metric-pill" style="background:${tone.background};color:${tone.color};">${label}</span>`;
 }
 
 function openRecordModal({ record = null, dateKey = "", mealType = "lunch", section = "meal" }) {
@@ -1451,6 +1513,16 @@ function upsertDailyMetric(metric) {
     state.dailyMetrics[index] = metric;
   } else {
     state.dailyMetrics.push(metric);
+  }
+
+  persistDailyMetrics();
+}
+
+function removeDailyMetric(metricId) {
+  state.dailyMetrics = state.dailyMetrics.filter((metric) => metric.id !== metricId);
+
+  if (elements.dailyMetricsForm.dataset.editingMetricId === metricId) {
+    clearDailyMetricEditState();
   }
 
   persistDailyMetrics();
