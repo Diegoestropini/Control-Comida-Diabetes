@@ -433,20 +433,24 @@ function renderInsights(insights) {
         <div class="insight-kpi-row">
           <div class="insight-kpi">
             <strong>${insights.glucoseVariability.deviationDisplay}</strong>
-            <span>Desvio estandar</span>
+            <span>SD</span>
           </div>
           <div class="insight-kpi">
-            <strong>${insights.glucoseVariability.rangeDisplay}</strong>
-            <span>Rango observado</span>
+            <strong>${insights.glucoseVariability.cvDisplay}</strong>
+            <span>CV</span>
           </div>
         </div>
         <div class="insight-line">
-          <span>Lectura</span>
+          <span>Interpretacion</span>
           <strong>${insights.glucoseVariability.levelLabel}</strong>
         </div>
         <div class="insight-line insight-line-detail">
-          <span>Ultimos valores</span>
-          <span>${insights.glucoseVariability.latestPairDisplay}</span>
+          <span>Rango real</span>
+          <span>${insights.glucoseVariability.rangeDisplay}</span>
+        </div>
+        <div class="insight-line insight-line-detail">
+          <span>Base del calculo</span>
+          <span>${insights.glucoseVariability.basisLabel}</span>
         </div>
       </div>
     </article>
@@ -875,13 +879,15 @@ function computeInsightsSafely(records, dailyMetrics) {
       glucoseVariability: {
         deviation: null,
         deviationDisplay: "Sin datos",
+        cv: null,
+        cvDisplay: "Sin datos",
         rangeDisplay: "Sin datos",
         minDisplay: "Sin datos",
         maxDisplay: "Sin datos",
-        latestPairDisplay: "Sin datos",
+        basisLabel: "Sin datos disponibles",
         levelLabel: "Sin datos disponibles",
         tone: "neutral",
-        exportable: { deviation: null, min: null, max: null, range: null },
+        exportable: { deviation: null, cv: null, min: null, max: null, range: null },
       },
       controlHighlights: {
         bestDay: null,
@@ -1039,42 +1045,46 @@ function computeGlucoseVariability(metrics) {
     return {
       deviation: null,
       deviationDisplay: "Sin datos",
+      cv: null,
+      cvDisplay: "Sin datos",
       rangeDisplay: "Sin datos",
       minDisplay: "Sin datos",
       maxDisplay: "Sin datos",
-      latestPairDisplay: "Sin datos",
+      basisLabel: "Todavia no hay indicadores diarios",
       levelLabel: "Todavia no hay indicadores diarios",
       tone: "neutral",
-      exportable: { deviation: null, min: null, max: null, range: null },
+      exportable: { deviation: null, cv: null, min: null, max: null, range: null },
     };
   }
 
   const avg = average(values);
   const variance = values.reduce((sum, value) => sum + ((value - avg) ** 2), 0) / values.length;
   const deviation = roundMetric(Math.sqrt(variance));
+  const cv = avg > 0 ? roundMetric((deviation / avg) * 100) : null;
   const min = Math.min(...values);
   const max = Math.max(...values);
-  const latestValue = sortedMetrics[0]?.averageGlucose ?? null;
-  const previousValue = sortedMetrics[1]?.averageGlucose ?? null;
-  const range = latestValue !== null && previousValue !== null
-    ? roundMetric(Math.abs(latestValue - previousValue))
-    : 0;
-  const levelLabel = deviation <= 10 ? "Variacion baja" : deviation <= 20 ? "Variacion moderada" : "Variacion alta";
-  const tone = deviation <= 10 ? "good" : deviation <= 20 ? "warning" : "danger";
+  const range = roundMetric(max - min);
+  const levelLabel = cv === null
+    ? "No se pudo calcular el CV"
+    : cv < 36
+      ? "Variabilidad entre promedios diarios dentro de objetivo"
+      : "Variabilidad entre promedios diarios elevada";
+  const tone = cv === null ? "neutral" : cv < 36 ? "good" : "danger";
 
   return {
     deviation,
     deviationDisplay: `${deviation} mg/dL`,
-    rangeDisplay: `${range} mg/dL`,
+    cv,
+    cvDisplay: cv === null ? "Sin datos" : `${cv}%`,
+    rangeDisplay: `${formatGlucose(min)} - ${formatGlucose(max)}`,
     minDisplay: formatGlucose(min),
     maxDisplay: formatGlucose(max),
-    latestPairDisplay: latestValue !== null && previousValue !== null
-      ? `${formatGlucose(latestValue)} / ${formatGlucose(previousValue)}`
-      : "Hace falta otro dia",
+    basisLabel: "Basado en promedios diarios; no reemplaza CGM ni lecturas intradia",
     levelLabel,
     tone,
     exportable: {
       deviation,
+      cv,
       min,
       max,
       range,
