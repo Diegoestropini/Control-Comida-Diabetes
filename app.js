@@ -17,6 +17,7 @@ const state = {
   dailyMetrics: loadDailyMetrics(),
   showAllDailyMetrics: false,
   showAllHistory: false,
+  insightsMonth: "all",
 };
 
 const elements = {
@@ -358,17 +359,38 @@ function renderStats() {
     ),
   ].join("");
 
-  renderInsights(insights);
+  renderInsights(insights, state.dailyMetrics);
   renderTimeline(stats.timeline);
   renderMealBreakdown(stats.breakdownByMeal, insights.mealComparison || createEmptyMealComparison());
   renderMissingSummary(stats.missingCount);
   renderDailyMetricsBoard(dailyMetricStats.sortedMetrics);
 }
 
-function renderInsights(insights) {
+function renderInsights(insights, dailyMetrics) {
   if (!elements.insightsGrid) {
     return;
   }
+
+  const monthOptions = getAvailableMetricMonths(dailyMetrics);
+  if (state.insightsMonth !== "all" && !monthOptions.includes(state.insightsMonth)) {
+    state.insightsMonth = "all";
+  }
+
+  const selectedMetrics = filterMetricsByMonth(dailyMetrics, state.insightsMonth);
+  const selectedVariability = computeGlucoseVariability(selectedMetrics);
+  const selectedHighlights = computeControlHighlights(selectedMetrics);
+  const selectedMonthLabel = state.insightsMonth === "all" ? "Total" : formatMonthKey(state.insightsMonth);
+  const monthSelectMarkup = `
+    <label class="insight-month-filter">
+      <span>Ver</span>
+      <select data-insights-month-select>
+        <option value="all"${state.insightsMonth === "all" ? " selected" : ""}>Total</option>
+        ${monthOptions.map((monthKey) => (
+          `<option value="${monthKey}"${state.insightsMonth === monthKey ? " selected" : ""}>${formatMonthKey(monthKey)}</option>`
+        )).join("")}
+      </select>
+    </label>
+  `;
 
   const weeklyMarkup = insights.weeklyComparison.hasComparison
     ? `
@@ -427,43 +449,50 @@ function renderInsights(insights) {
       </div>
     </article>
 
-    <article class="mini-panel neon-summary-mini insight-panel insight-panel-wide insight-panel-variability insight-panel-variability-${insights.glucoseVariability.tone}">
-      <h3>Variabilidad de glucosa</h3>
+    <article class="mini-panel neon-summary-mini insight-panel insight-panel-wide insight-panel-variability insight-panel-variability-${selectedVariability.tone}">
+      <div class="insight-panel-heading">
+        <h3>Variabilidad de glucosa</h3>
+        ${monthSelectMarkup}
+      </div>
       <div class="mini-panel-body">
         <div class="insight-kpi-row">
           <div class="insight-kpi">
-            <strong>${insights.glucoseVariability.deviationDisplay}</strong>
+            <strong>${selectedVariability.deviationDisplay}</strong>
             <span>SD</span>
           </div>
           <div class="insight-kpi">
-            <strong>${insights.glucoseVariability.cvDisplay}</strong>
+            <strong>${selectedVariability.cvDisplay}</strong>
             <span>CV</span>
           </div>
         </div>
         <div class="insight-line">
           <span>Interpretacion</span>
-          <strong>${insights.glucoseVariability.levelLabel}</strong>
+          <strong>${selectedVariability.levelLabel}</strong>
+        </div>
+        <div class="insight-line insight-line-detail">
+          <span>Periodo</span>
+          <span>${selectedMonthLabel}</span>
         </div>
         <div class="insight-line insight-line-detail">
           <span>Rango real</span>
-          <span>${insights.glucoseVariability.rangeDisplay}</span>
+          <span>${selectedVariability.rangeDisplay}</span>
         </div>
         <div class="insight-line insight-line-detail">
           <span>Glucosa media</span>
-          <span>${insights.glucoseVariability.averageDisplay}</span>
+          <span>${selectedVariability.averageDisplay}</span>
         </div>
         <div class="insight-line insight-line-detail">
           <span>HbA1c aproximada</span>
-          <span class="insight-a1c-pill" style="background:${insights.glucoseVariability.estimatedA1cTone.background};color:${insights.glucoseVariability.estimatedA1cTone.color};">
-            ${insights.glucoseVariability.estimatedA1cDisplay}
+          <span class="insight-a1c-pill" style="background:${selectedVariability.estimatedA1cTone.background};color:${selectedVariability.estimatedA1cTone.color};">
+            ${selectedVariability.estimatedA1cDisplay}
           </span>
         </div>
         <div class="insight-line insight-line-detail">
           <span>Base del calculo</span>
-          <span>${insights.glucoseVariability.basisLabel}</span>
+          <span>${selectedVariability.basisLabel}</span>
         </div>
         <div class="insight-variability-summary">
-          ${insights.glucoseVariability.summaryLabel}
+          ${selectedVariability.summaryLabel}
         </div>
       </div>
     </article>
@@ -471,17 +500,25 @@ function renderInsights(insights) {
     <article class="mini-panel neon-summary-mini insight-panel insight-panel-day insight-panel-day-best">
       <h3>Mejor dia de control</h3>
       <div class="mini-panel-body">
-        ${renderControlDayHighlight(insights.controlHighlights.bestDay, "Todavia no hay indicadores diarios para detectar el mejor dia.")}
+        ${renderControlDayHighlight(selectedHighlights.bestDay, "Todavia no hay indicadores diarios para detectar el mejor dia.")}
       </div>
     </article>
 
     <article class="mini-panel neon-summary-mini insight-panel insight-panel-day insight-panel-day-worst">
       <h3>Peor dia de control</h3>
       <div class="mini-panel-body">
-        ${renderControlDayHighlight(insights.controlHighlights.worstDay, "Todavia no hay indicadores diarios para detectar el peor dia.")}
+        ${renderControlDayHighlight(selectedHighlights.worstDay, "Todavia no hay indicadores diarios para detectar el peor dia.")}
       </div>
     </article>
   `;
+
+  const monthSelect = elements.insightsGrid.querySelector("[data-insights-month-select]");
+  if (monthSelect) {
+    monthSelect.addEventListener("input", (event) => {
+      state.insightsMonth = event.target.value || "all";
+      render();
+    });
+  }
 }
 
 function renderControlDayHighlight(day, emptyMessage) {
@@ -1280,6 +1317,26 @@ function formatControlDay(metric) {
     timeInRangeDisplay: formatPercentage(metric.timeInRange),
     averageGlucoseDisplay: formatGlucose(metric.averageGlucose),
   };
+}
+
+function getAvailableMetricMonths(metrics) {
+  return [...new Set(metrics.map((metric) => metric.metricDate.slice(0, 7)).filter(Boolean))].sort((left, right) => right.localeCompare(left));
+}
+
+function filterMetricsByMonth(metrics, monthKey) {
+  if (!monthKey || monthKey === "all") {
+    return metrics;
+  }
+
+  return metrics.filter((metric) => metric.metricDate.startsWith(`${monthKey}-`));
+}
+
+function formatMonthKey(monthKey) {
+  const [year, month] = monthKey.split("-").map(Number);
+  return new Intl.DateTimeFormat("es-UY", {
+    month: "long",
+    year: "numeric",
+  }).format(new Date(year, month - 1, 1));
 }
 
 function getSortedUniqueDates(dates) {

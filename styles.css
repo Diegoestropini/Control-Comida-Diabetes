@@ -617,6 +617,32 @@ textarea {
   gap: 14px;
 }
 
+.insight-panel-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.insight-month-filter {
+  display: inline-grid;
+  gap: 6px;
+  justify-items: end;
+  color: #d9f4ff;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.insight-month-filter select {
+  min-width: 170px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(145, 178, 227, 0.18);
+  background: rgba(7, 20, 32, 0.82);
+  color: #f4fbff;
+  font: inherit;
+}
+
 .insight-panel .mini-panel-body,
 .insight-panel .insight-line span,
 .insight-panel .insight-kpi span,
@@ -1159,7 +1185,8 @@ textarea {
   .hero,
   .panel-header,
   .form-meta,
-  .history-header {
+  .history-header,
+  .insight-panel-heading {
     flex-direction: column;
     align-items: stretch;
   }
