@@ -1,4 +1,5 @@
 const STORAGE_KEY = "diabetes-control-records-v1";
+const DAILY_METRICS_KEY = "diabetes-control-daily-metrics-v1";
 const CLOSURE_KEY = "diabetes-control-last-closure";
 
 const DEFAULT_TIMES = {
@@ -13,18 +14,25 @@ const MEAL_LABELS = {
 
 const state = {
   records: loadRecords(),
+  dailyMetrics: loadDailyMetrics(),
+  showAllDailyMetrics: false,
 };
 
 const elements = {
   todayLabel: document.getElementById("today-label"),
   notice: document.getElementById("notice"),
   statsGrid: document.getElementById("stats-grid"),
+  dailyMetricsSummary: document.getElementById("daily-metrics-summary"),
+  dailyMetricsBoard: document.getElementById("daily-metrics-board"),
   timelineChart: document.getElementById("timeline-chart"),
   mealBreakdown: document.getElementById("meal-breakdown"),
   missingSummary: document.getElementById("missing-summary"),
   historyBody: document.getElementById("history-body"),
   exportButton: document.getElementById("export-button"),
   forceCloseButton: document.getElementById("force-close-button"),
+  dailyMetricsForm: document.getElementById("daily-metrics-form"),
+  dailyMetricsMeta: document.getElementById("daily-metrics-meta"),
+  dailyMetricsCancel: document.getElementById("daily-metrics-cancel"),
   filterFrom: document.getElementById("filter-from"),
   filterTo: document.getElementById("filter-to"),
   filterTolerance: document.getElementById("filter-tolerance"),
@@ -245,6 +253,7 @@ function runDailyClosure(options = {}) {
 function render() {
   elements.todayLabel.textContent = formatDate(getLocalDateKey(new Date()));
   renderForms();
+  renderDailyMetricsForm();
   renderStats();
   renderHistory();
 }
@@ -286,8 +295,36 @@ function renderForms() {
   });
 }
 
+function renderDailyMetricsForm() {
+  const form = elements.dailyMetricsForm;
+  if (!form) {
+    return;
+  }
+
+  const editingMetric = form.dataset.editingMetricId ? findDailyMetricById(form.dataset.editingMetricId) : null;
+  const todayKey = getLocalDateKey(new Date());
+
+  if (editingMetric) {
+    form.elements.metricDate.value = editingMetric.metricDate;
+    form.elements.timeInRange.value = editingMetric.timeInRange;
+    form.elements.averageGlucose.value = editingMetric.averageGlucose;
+    elements.dailyMetricsMeta.textContent = `Editando indicadores del ${formatDate(editingMetric.metricDate)}. Se actualizará el mismo día sin duplicarlo.`;
+    return;
+  }
+
+  const selectedDate = form.elements.metricDate.value || todayKey;
+  const existingMetric = findDailyMetricByDate(selectedDate);
+  form.elements.metricDate.value = selectedDate;
+  form.elements.timeInRange.value = existingMetric?.timeInRange ?? "";
+  form.elements.averageGlucose.value = existingMetric?.averageGlucose ?? "";
+  elements.dailyMetricsMeta.textContent = existingMetric
+    ? `Ya existe un indicador para ${formatDate(selectedDate)}. Si guardás, se actualizará.`
+    : "Este registro es independiente de almuerzo y cena. Puede tener otra fecha y se exporta en JSON.";
+}
+
 function renderStats() {
   const stats = computeStats(state.records);
+  const dailyMetricStats = computeDailyMetricStats(state.dailyMetrics);
 
   elements.statsGrid.innerHTML = [
     createStatCard("Total de registros", String(stats.totalRecords)),
@@ -296,10 +333,31 @@ function renderStats() {
     createStatCard("Rojos", `${stats.counts.rojo} (${stats.percentages.rojo}%)`),
     createStatCard("Pendientes", String(stats.pendingCount)),
   ].join("");
+  elements.dailyMetricsSummary.innerHTML = [
+    createMetricSummaryCard(
+      "Promedio tiempo en rango",
+      dailyMetricStats.averageTimeInRangeDisplay,
+      `${dailyMetricStats.inTargetDays}/${dailyMetricStats.totalDays} día(s) en objetivo`,
+      getTimeInRangeTone(dailyMetricStats.averageTimeInRange)
+    ),
+    createMetricSummaryCard(
+      "Promedio glucosa media",
+      dailyMetricStats.averageGlucoseDisplay,
+      `${dailyMetricStats.glucoseInTargetDays}/${dailyMetricStats.totalDays} día(s) dentro de meta`,
+      getAverageGlucoseTone(dailyMetricStats.averageGlucose)
+    ),
+    createMetricSummaryCard(
+      "Cobertura diaria",
+      String(dailyMetricStats.totalDays),
+      "Registros diarios independientes exportados en JSON",
+      dailyMetricStats.totalDays ? { background: "rgba(115, 184, 255, 0.9)", color: "#06111d" } : { background: "rgba(148, 163, 184, 0.7)", color: "#06111d" }
+    ),
+  ].join("");
 
   renderTimeline(stats.timeline);
   renderMealBreakdown(stats.breakdownByMeal);
   renderMissingSummary(stats.missingCount);
+  renderDailyMetricsBoard(dailyMetricStats.sortedMetrics);
 }
 
 function renderTimeline(timeline) {
@@ -351,6 +409,70 @@ function renderMissingSummary(missingCount) {
     <div class="mini-line"><span>Creación automática</span><span>Al cierre del día</span></div>
     <div class="mini-line"><span>Edición posterior</span><span>Permitida</span></div>
   `;
+}
+
+function renderDailyMetricsBoard(metrics) {
+  if (!metrics.length) {
+    elements.dailyMetricsBoard.innerHTML = '<div class="metric-day-empty">Todavía no hay indicadores diarios cargados.</div>';
+    return;
+  }
+
+  const visibleMetrics = state.showAllDailyMetrics ? metrics : metrics.slice(0, 3);
+  const toggleMarkup = metrics.length > 3
+    ? `
+      <div class="metric-board-actions">
+        <button class="table-action" data-action="toggle-daily-metrics" type="button">
+          ${state.showAllDailyMetrics ? "Mostrar menos" : `Mostrar mas (${metrics.length - 3} mas)`}
+        </button>
+      </div>
+    `
+    : "";
+
+  elements.dailyMetricsBoard.innerHTML = visibleMetrics.map((metric) => {
+    const tirTone = getTimeInRangeTone(metric.timeInRange);
+    const glucoseTone = getAverageGlucoseTone(metric.averageGlucose);
+
+    return `
+      <article class="metric-day-card">
+        <div class="metric-day-header">
+          <div>
+            <div class="metric-day-date">${formatDate(metric.metricDate)}</div>
+            <div class="metric-day-caption">Actualizado ${formatDateTime(metric.updatedAt)}</div>
+          </div>
+          <div class="metric-day-actions">
+            <button class="table-action" data-action="edit-daily-metric" data-metric-id="${metric.id}" type="button">Editar</button>
+          </div>
+        </div>
+        <div class="metric-chip-grid">
+          <div class="metric-chip" style="background:${tirTone.background};color:${tirTone.color};">
+            <span class="metric-chip-label">Tiempo en rango</span>
+            <strong class="metric-chip-value">${formatPercentage(metric.timeInRange)}</strong>
+          </div>
+          <div class="metric-chip" style="background:${glucoseTone.background};color:${glucoseTone.color};">
+            <span class="metric-chip-label">Glucosa media</span>
+            <strong class="metric-chip-value">${formatGlucose(metric.averageGlucose)}</strong>
+          </div>
+        </div>
+      </article>
+    `;
+  }).join("") + toggleMarkup;
+
+  elements.dailyMetricsBoard.querySelectorAll('[data-action="edit-daily-metric"]').forEach((button) => {
+    button.addEventListener("click", () => {
+      const metric = findDailyMetricById(button.dataset.metricId);
+      if (metric) {
+        populateDailyMetricForm(metric);
+      }
+    });
+  });
+
+  const toggleButton = elements.dailyMetricsBoard.querySelector('[data-action="toggle-daily-metrics"]');
+  if (toggleButton) {
+    toggleButton.addEventListener("click", () => {
+      state.showAllDailyMetrics = !state.showAllDailyMetrics;
+      renderStats();
+    });
+  }
 }
 
 function renderHistory() {
@@ -511,9 +633,27 @@ function calculatePercentage(value, total) {
 }
 
 function exportRecords() {
+  const mealStats = computeStats(state.records);
+  const dailyMetricStats = computeDailyMetricStats(state.dailyMetrics);
   const payload = {
     exportedAt: new Date().toISOString(),
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    summary: {
+      meals: {
+        totalRecords: mealStats.totalRecords,
+        counts: mealStats.counts,
+        percentages: mealStats.percentages,
+        pendingCount: mealStats.pendingCount,
+        missingCount: mealStats.missingCount,
+      },
+      dailyMetrics: {
+        totalDays: dailyMetricStats.totalDays,
+        averageTimeInRange: dailyMetricStats.averageTimeInRange,
+        averageGlucose: dailyMetricStats.averageGlucose,
+        inTargetDays: dailyMetricStats.inTargetDays,
+        glucoseInTargetDays: dailyMetricStats.glucoseInTargetDays,
+      },
+    },
     records: sortRecords(state.records).map((record) => ({
       id: record.id,
       mealType: record.mealType,
@@ -525,6 +665,14 @@ function exportRecords() {
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
       status: record.status,
+    })),
+    dailyMetrics: sortDailyMetrics(state.dailyMetrics).map((metric) => ({
+      id: metric.id,
+      metricDate: metric.metricDate,
+      timeInRange: metric.timeInRange,
+      averageGlucose: metric.averageGlucose,
+      createdAt: metric.createdAt,
+      updatedAt: metric.updatedAt,
     })),
   };
 
@@ -589,8 +737,27 @@ function loadRecords() {
   }
 }
 
+function loadDailyMetrics() {
+  try {
+    const raw = localStorage.getItem(DAILY_METRICS_KEY);
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.error("No se pudieron leer los indicadores diarios guardados.", error);
+    return [];
+  }
+}
+
 function persistRecords() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.records));
+}
+
+function persistDailyMetrics() {
+  localStorage.setItem(DAILY_METRICS_KEY, JSON.stringify(state.dailyMetrics));
 }
 
 function setNotice(message) {
@@ -619,6 +786,16 @@ function createStatCard(label, value) {
     <article class="stat-card">
       <strong>${value}</strong>
       <p>${label}</p>
+    </article>
+  `;
+}
+
+function createMetricSummaryCard(label, value, detail, tone) {
+  return `
+    <article class="metric-summary-card" style="background:${tone.background};color:${tone.color};">
+      <strong>${value}</strong>
+      <p>${label}</p>
+      <p>${detail}</p>
     </article>
   `;
 }
@@ -954,6 +1131,21 @@ function bindEvents() {
     });
   });
 
+  elements.dailyMetricsForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    saveDailyMetric();
+  });
+  elements.dailyMetricsForm.elements.metricDate.addEventListener("input", () => {
+    if (!elements.dailyMetricsForm.dataset.editingMetricId) {
+      renderDailyMetricsForm();
+    }
+  });
+  elements.dailyMetricsCancel.addEventListener("click", () => {
+    clearDailyMetricEditState();
+    render();
+    setNotice("Edición de indicadores diarios cancelada.");
+  });
+
   const modal = getModalUI();
   modal.quickEntryButton.addEventListener("click", () => {
     openRecordModal({
@@ -1187,6 +1379,221 @@ function populateFormForEdit(record) {
 
 function populateToleranceForm(record) {
   openRecordModal({ record, section: "tolerance" });
+}
+
+function saveDailyMetric() {
+  const form = elements.dailyMetricsForm;
+  const now = new Date();
+  const metricDate = form.elements.metricDate.value || getLocalDateKey(now);
+  const timeInRange = Number(form.elements.timeInRange.value);
+  const averageGlucose = Number(form.elements.averageGlucose.value);
+  const editingMetric = form.dataset.editingMetricId ? findDailyMetricById(form.dataset.editingMetricId) : null;
+  const sameDateMetric = findDailyMetricByDate(metricDate);
+  const timestamp = now.toISOString();
+
+  if (!Number.isFinite(timeInRange) || timeInRange < 0 || timeInRange > 100) {
+    setNotice("El tiempo en rango debe estar entre 0% y 100%.");
+    return;
+  }
+
+  if (!Number.isFinite(averageGlucose) || averageGlucose < 0) {
+    setNotice("La glucosa media debe ser un valor válido en mg/dL.");
+    return;
+  }
+
+  if (editingMetric && sameDateMetric && sameDateMetric.id !== editingMetric.id) {
+    setNotice(`Ya existe un indicador diario para ${formatDate(metricDate)}.`);
+    return;
+  }
+
+  const existingMetric = editingMetric || sameDateMetric;
+
+  const metric = existingMetric || {
+    id: createMetricId(),
+    metricDate,
+    createdAt: timestamp,
+  };
+
+  metric.metricDate = metricDate;
+  metric.timeInRange = roundMetric(timeInRange);
+  metric.averageGlucose = roundMetric(averageGlucose);
+  metric.updatedAt = timestamp;
+  metric.createdAt = existingMetric ? existingMetric.createdAt : timestamp;
+
+  upsertDailyMetric(metric);
+  clearDailyMetricEditState();
+  render();
+  setNotice(
+    existingMetric
+      ? `Indicadores diarios actualizados para ${formatDate(metricDate)}.`
+      : `Indicadores diarios guardados para ${formatDate(metricDate)}.`
+  );
+}
+
+function populateDailyMetricForm(metric) {
+  const form = elements.dailyMetricsForm;
+  form.dataset.editingMetricId = metric.id;
+  form.scrollIntoView({ behavior: "smooth", block: "start" });
+  renderDailyMetricsForm();
+  setNotice(`Editando indicadores diarios del ${formatDate(metric.metricDate)}.`);
+}
+
+function clearDailyMetricEditState() {
+  const form = elements.dailyMetricsForm;
+  delete form.dataset.editingMetricId;
+  form.reset();
+  form.elements.metricDate.value = getLocalDateKey(new Date());
+}
+
+function upsertDailyMetric(metric) {
+  const index = state.dailyMetrics.findIndex((item) => item.id === metric.id);
+  if (index >= 0) {
+    state.dailyMetrics[index] = metric;
+  } else {
+    state.dailyMetrics.push(metric);
+  }
+
+  persistDailyMetrics();
+}
+
+function findDailyMetricByDate(metricDate) {
+  return state.dailyMetrics.find((metric) => metric.metricDate === metricDate) || null;
+}
+
+function findDailyMetricById(metricId) {
+  return state.dailyMetrics.find((metric) => metric.id === metricId) || null;
+}
+
+function sortDailyMetrics(metrics) {
+  return [...metrics].sort((left, right) => right.metricDate.localeCompare(left.metricDate));
+}
+
+function computeDailyMetricStats(metrics) {
+  const sortedMetrics = sortDailyMetrics(metrics);
+  const totalDays = sortedMetrics.length;
+  const averageTimeInRange = totalDays
+    ? roundMetric(sortedMetrics.reduce((sum, metric) => sum + Number(metric.timeInRange || 0), 0) / totalDays)
+    : null;
+  const averageGlucose = totalDays
+    ? roundMetric(sortedMetrics.reduce((sum, metric) => sum + Number(metric.averageGlucose || 0), 0) / totalDays)
+    : null;
+
+  return {
+    totalDays,
+    averageTimeInRange,
+    averageGlucose,
+    averageTimeInRangeDisplay: averageTimeInRange === null ? "Sin datos" : formatPercentage(averageTimeInRange),
+    averageGlucoseDisplay: averageGlucose === null ? "Sin datos" : formatGlucose(averageGlucose),
+    inTargetDays: sortedMetrics.filter((metric) => Number(metric.timeInRange) >= 70).length,
+    glucoseInTargetDays: sortedMetrics.filter((metric) => Number(metric.averageGlucose) <= 154).length,
+    sortedMetrics,
+  };
+}
+
+function createMetricId() {
+  return `met_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function roundMetric(value) {
+  return Math.round(value * 10) / 10;
+}
+
+function formatPercentage(value) {
+  return `${roundMetric(value)}%`;
+}
+
+function formatGlucose(value) {
+  return `${roundMetric(value)} mg/dL`;
+}
+
+function getTimeInRangeTone(value) {
+  if (!Number.isFinite(value)) {
+    return { background: "rgba(148, 163, 184, 0.7)", color: "#06111d" };
+  }
+
+  const background = value >= 90
+    ? interpolateColor(value, 90, 100, "#8fefad", "#d9f99d")
+    : value >= 70
+      ? interpolateColor(value, 70, 90, "#166534", "#8fefad")
+      : interpolateMultiStop(value, [
+          { value: 0, color: "#dc2626" },
+          { value: 35, color: "#f97316" },
+          { value: 70, color: "#166534" },
+        ]);
+
+  return { background, color: getReadableTextColor(background) };
+}
+
+function getAverageGlucoseTone(value) {
+  if (!Number.isFinite(value)) {
+    return { background: "rgba(148, 163, 184, 0.7)", color: "#06111d" };
+  }
+
+  const background = value <= 126
+    ? "#8fefad"
+    : value <= 154
+      ? interpolateColor(value, 126, 154, "#8fefad", "#166534")
+      : interpolateMultiStop(Math.min(value, 240), [
+          { value: 154, color: "#facc15" },
+          { value: 180, color: "#f97316" },
+          { value: 240, color: "#dc2626" },
+        ]);
+
+  return { background, color: getReadableTextColor(background) };
+}
+
+function interpolateMultiStop(value, stops) {
+  if (value <= stops[0].value) {
+    return stops[0].color;
+  }
+
+  for (let index = 1; index < stops.length; index += 1) {
+    if (value <= stops[index].value) {
+      return interpolateColor(value, stops[index - 1].value, stops[index].value, stops[index - 1].color, stops[index].color);
+    }
+  }
+
+  return stops[stops.length - 1].color;
+}
+
+function interpolateColor(value, min, max, startColor, endColor) {
+  if (max <= min) {
+    return endColor;
+  }
+
+  const clampedRatio = Math.min(1, Math.max(0, (value - min) / (max - min)));
+  const start = hexToRgb(startColor);
+  const end = hexToRgb(endColor);
+  const mix = {
+    r: Math.round(start.r + (end.r - start.r) * clampedRatio),
+    g: Math.round(start.g + (end.g - start.g) * clampedRatio),
+    b: Math.round(start.b + (end.b - start.b) * clampedRatio),
+  };
+
+  return rgbToHex(mix);
+}
+
+function hexToRgb(hex) {
+  const normalized = hex.replace("#", "");
+  const value = normalized.length === 3
+    ? normalized.split("").map((item) => item + item).join("")
+    : normalized;
+
+  return {
+    r: Number.parseInt(value.slice(0, 2), 16),
+    g: Number.parseInt(value.slice(2, 4), 16),
+    b: Number.parseInt(value.slice(4, 6), 16),
+  };
+}
+
+function rgbToHex({ r, g, b }) {
+  return `#${[r, g, b].map((item) => item.toString(16).padStart(2, "0")).join("")}`;
+}
+
+function getReadableTextColor(hex) {
+  const { r, g, b } = hexToRgb(hex);
+  const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  return luminance > 0.62 ? "#06111d" : "#f8fafc";
 }
 
 function currentMealType() {

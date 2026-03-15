@@ -188,6 +188,43 @@
             </form>
           </article>
         </div>
+
+        <article class="daily-metrics-card">
+          <div class="meal-card-header">
+            <div>
+              <p class="meal-label">Indicadores diarios</p>
+              <h3>Tiempo en rango y glucosa media</h3>
+            </div>
+            <span class="meal-badge metrics">CGM</span>
+          </div>
+
+          <form id="daily-metrics-form" class="daily-metrics-form">
+            <div class="daily-metrics-grid">
+              <label>
+                <span>Fecha del indicador</span>
+                <input name="metricDate" type="date" required>
+              </label>
+
+              <label>
+                <span>Tiempo en rango (%)</span>
+                <input name="timeInRange" type="number" min="0" max="100" step="1" placeholder="Ejemplo: 78" required>
+              </label>
+
+              <label>
+                <span>Glucosa media (mg/dL)</span>
+                <input name="averageGlucose" type="number" min="0" max="500" step="1" placeholder="Ejemplo: 142" required>
+              </label>
+            </div>
+
+            <div class="form-meta">
+              <p class="hint" id="daily-metrics-meta">Este registro es independiente de almuerzo y cena. Puede tener otra fecha y se exporta en JSON.</p>
+              <div class="form-actions">
+                <button id="daily-metrics-cancel" class="action-button ghost" type="button">Cancelar</button>
+                <button class="action-button secondary" type="submit">Guardar indicadores</button>
+              </div>
+            </div>
+          </form>
+        </article>
       </section>
 
       <section class="panel stats-panel">
@@ -200,6 +237,8 @@
 
         <div class="stats-grid" id="stats-grid"></div>
 
+        <div id="daily-metrics-summary" class="daily-metrics-summary"></div>
+
         <div class="chart-panel">
           <div class="chart-header">
             <h3>Tendencia cronológica</h3>
@@ -209,6 +248,10 @@
         </div>
 
         <div class="breakdown-grid">
+          <div class="mini-panel">
+            <h3>Indicadores por día</h3>
+            <div id="daily-metrics-board" class="daily-metrics-board"></div>
+          </div>
           <div class="mini-panel">
             <h3>Almuerzo vs cena</h3>
             <div id="meal-breakdown" class="mini-panel-body"></div>
