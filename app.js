@@ -478,24 +478,6 @@ function renderInsights(insights, dailyMetrics) {
         ${monthSelectMarkup}
       </div>
       <div class="mini-panel-body">
-        <div class="insight-kpi-row">
-          <div class="insight-kpi">
-            <strong>${selectedVariability.deviationDisplay}</strong>
-            <span>SD</span>
-          </div>
-          <div class="insight-kpi">
-            <strong>${selectedVariability.cvDisplay}</strong>
-            <span>CV</span>
-          </div>
-        </div>
-        <div class="insight-line">
-          <span>Interpretacion</span>
-          <strong>${selectedVariability.levelLabel}</strong>
-        </div>
-        <div class="insight-line insight-line-detail">
-          <span>Periodo</span>
-          <span>${selectedMonthLabel}</span>
-        </div>
         <div class="insight-line insight-line-detail">
           <span>Rango real</span>
           <span>${selectedVariability.rangeDisplay}</span>
@@ -509,13 +491,6 @@ function renderInsights(insights, dailyMetrics) {
           <span class="insight-a1c-pill" style="background:${selectedVariability.estimatedA1cTone.background};color:${selectedVariability.estimatedA1cTone.color};">
             ${selectedVariability.estimatedA1cDisplay}
           </span>
-        </div>
-        <div class="insight-line insight-line-detail">
-          <span>Base del calculo</span>
-          <span>${selectedVariability.basisLabel}</span>
-        </div>
-        <div class="insight-variability-summary">
-          ${selectedVariability.summaryLabel}
         </div>
       </div>
     </article>
