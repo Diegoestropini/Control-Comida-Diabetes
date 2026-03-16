@@ -492,6 +492,12 @@ function renderInsights(insights, dailyMetrics) {
             ${selectedVariability.estimatedA1cDisplay}
           </span>
         </div>
+        <div class="insight-line insight-line-detail">
+          <span>Promedio tiempo en rango</span>
+          <span class="insight-a1c-pill" style="background:${selectedVariability.averageTimeInRangeTone.background};color:${selectedVariability.averageTimeInRangeTone.color};">
+            ${selectedVariability.averageTimeInRangeDisplay}
+          </span>
+        </div>
       </div>
     </article>
 
@@ -1092,9 +1098,13 @@ function computeGlucoseVariability(metrics) {
     .map((metric) => ({
       ...metric,
       averageGlucose: Number(metric.averageGlucose),
+      timeInRange: Number(metric.timeInRange),
     }))
     .filter((metric) => Number.isFinite(metric.averageGlucose));
   const values = sortedMetrics.map((metric) => metric.averageGlucose);
+  const timeInRangeValues = sortedMetrics
+    .map((metric) => metric.timeInRange)
+    .filter((value) => Number.isFinite(value));
 
   if (!values.length) {
     return {
@@ -1105,6 +1115,9 @@ function computeGlucoseVariability(metrics) {
       estimatedA1c: null,
       estimatedA1cDisplay: "Sin datos",
       estimatedA1cTone: { background: "rgba(148, 163, 184, 0.18)", color: "#e2e8f0" },
+      averageTimeInRange: null,
+      averageTimeInRangeDisplay: "Sin datos",
+      averageTimeInRangeTone: { background: "rgba(148, 163, 184, 0.18)", color: "#e2e8f0" },
       cv: null,
       cvDisplay: "Sin datos",
       rangeDisplay: "Sin datos",
@@ -1123,6 +1136,9 @@ function computeGlucoseVariability(metrics) {
   const deviation = roundMetric(Math.sqrt(variance));
   const cv = avg > 0 ? roundMetric((deviation / avg) * 100) : null;
   const estimatedA1c = estimateA1cFromAverageGlucose(avg);
+  const averageTimeInRange = timeInRangeValues.length
+    ? roundMetric(timeInRangeValues.reduce((sum, value) => sum + value, 0) / timeInRangeValues.length)
+    : null;
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = roundMetric(max - min);
@@ -1136,6 +1152,9 @@ function computeGlucoseVariability(metrics) {
     estimatedA1c,
     estimatedA1cDisplay: formatEstimatedA1c(estimatedA1c),
     estimatedA1cTone: getEstimatedA1cTone(estimatedA1c),
+    averageTimeInRange,
+    averageTimeInRangeDisplay: averageTimeInRange === null ? "Sin datos" : formatPercentage(averageTimeInRange),
+    averageTimeInRangeTone: getTimeInRangeTone(averageTimeInRange),
     cv,
     cvDisplay: cv === null ? "Sin datos" : `${cv}%`,
     rangeDisplay: `${formatGlucose(min)} - ${formatGlucose(max)}`,
