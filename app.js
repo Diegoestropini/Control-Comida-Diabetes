@@ -946,7 +946,7 @@ function computeInsightsSafely(records, dailyMetrics) {
         basisLabel: "Sin datos disponibles",
         levelLabel: "Sin datos disponibles",
         tone: "neutral",
-        exportable: { deviation: null, cv: null, min: null, max: null, range: null, estimatedA1c: null },
+        exportable: { min: null, max: null, range: null, estimatedA1c: null },
       },
       controlHighlights: {
         bestDay: null,
@@ -1127,7 +1127,7 @@ function computeGlucoseVariability(metrics) {
       levelLabel: "Todavia no hay indicadores diarios",
       summaryLabel: "Cargá indicadores diarios para ver una lectura simple del promedio y la estabilidad.",
       tone: "neutral",
-      exportable: { deviation: null, cv: null, min: null, max: null, range: null, estimatedA1c: null },
+      exportable: { min: null, max: null, range: null, estimatedA1c: null },
     };
   }
 
@@ -1165,8 +1165,6 @@ function computeGlucoseVariability(metrics) {
     summaryLabel: interpretation.summaryLabel,
     tone: interpretation.tone,
     exportable: {
-      deviation,
-      cv,
       min,
       max,
       range,
