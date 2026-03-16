@@ -2049,6 +2049,7 @@ function getVisibleHistoryRecords(records) {
     return records;
   }
 
+  const maxVisibleDays = 3;
   const visibleDateKeys = new Set();
 
   return records.filter((record) => {
@@ -2056,7 +2057,7 @@ function getVisibleHistoryRecords(records) {
       return true;
     }
 
-    if (visibleDateKeys.size < 2) {
+    if (visibleDateKeys.size < maxVisibleDays) {
       visibleDateKeys.add(record.recordDate);
       return true;
     }
@@ -2073,7 +2074,7 @@ function renderHistoryMoreButton(records, visibleRecords) {
 
   elements.historyMoreShell.innerHTML = `
     <button class="table-action" data-action="toggle-history" type="button">
-      ${state.showAllHistory ? "Mostrar menos" : `Ver mas (${hiddenCount} registros)`}
+      ${state.showAllHistory ? "Mostrar menos" : `Mostrar mas (${hiddenCount} registros)`}
     </button>
   `;
 
