@@ -2120,7 +2120,7 @@ function getVisibleHistoryRecords(records) {
 
 function renderHistoryMoreButton(records, visibleRecords) {
   const hiddenCount = records.length - visibleRecords.length;
-  if (hiddenCount <= 0) {
+  if (hiddenCount <= 0 && !state.showAllHistory) {
     return;
   }
 
