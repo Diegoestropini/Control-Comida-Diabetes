@@ -587,15 +587,67 @@ function renderMealBreakdown(breakdown, mealComparison) {
       : mealComparison.worstMeal === mealType
         ? "Franja mas debil"
         : "Sin diferencia clara";
+    const totalWithTolerance = item.verde + item.amarillo + item.rojo;
+    const safeTotal = item.total || 1;
+    const greenShare = item.total ? Math.round((item.verde / safeTotal) * 100) : 0;
+    const yellowShare = item.total ? Math.round((item.amarillo / safeTotal) * 100) : 0;
+    const redShare = item.total ? Math.round((item.rojo / safeTotal) * 100) : 0;
+    const pendingShare = item.total ? Math.round((item.pending / safeTotal) * 100) : 0;
+    const comparisonTone = mealComparison.bestMeal === mealType
+      ? "success"
+      : mealComparison.worstMeal === mealType
+        ? "alert"
+        : "neutral";
 
     return `
-      <div class="mini-line"><strong>${MEAL_LABELS[mealType]}</strong><span>${item.total} total</span></div>
-      <div class="mini-line"><span>Verde %</span><span>${comparison.greenRateLabel}</span></div>
-      <div class="mini-line"><span>Pendiente</span><span>${item.pending}</span></div>
-      <div class="mini-line"><span>Verde</span><span>${item.verde}</span></div>
-      <div class="mini-line"><span>Amarillo</span><span>${item.amarillo}</span></div>
-      <div class="mini-line"><span>Rojo</span><span>${item.rojo}</span></div>
-      <div class="mini-line"><span>Lectura</span><span>${rankLabel}</span></div>
+      <article class="meal-breakdown-card meal-breakdown-card-${mealType}">
+        <div class="meal-breakdown-header">
+          <div>
+            <strong>${MEAL_LABELS[mealType]}</strong>
+            <span>${item.total} registro(s)</span>
+          </div>
+          <span class="meal-breakdown-rank ${comparisonTone}">${rankLabel}</span>
+        </div>
+
+        <div class="meal-breakdown-chips">
+          <div class="meal-breakdown-chip green">
+            <span>Verde</span>
+            <strong>${item.verde}</strong>
+            <small>${greenShare}%</small>
+          </div>
+          <div class="meal-breakdown-chip yellow">
+            <span>Amarillo</span>
+            <strong>${item.amarillo}</strong>
+            <small>${yellowShare}%</small>
+          </div>
+          <div class="meal-breakdown-chip red">
+            <span>Rojo</span>
+            <strong>${item.rojo}</strong>
+            <small>${redShare}%</small>
+          </div>
+        </div>
+
+        <div class="meal-breakdown-bars" aria-hidden="true">
+          <span class="meal-breakdown-bar green" style="width:${greenShare}%;"></span>
+          <span class="meal-breakdown-bar yellow" style="width:${yellowShare}%;"></span>
+          <span class="meal-breakdown-bar red" style="width:${redShare}%;"></span>
+        </div>
+
+        <div class="meal-breakdown-meta">
+          <div class="meal-breakdown-line">
+            <span>Efectividad verde</span>
+            <strong>${comparison.greenRateLabel}</strong>
+          </div>
+          <div class="meal-breakdown-line">
+            <span>Con tolerancia</span>
+            <strong>${totalWithTolerance}</strong>
+          </div>
+          <div class="meal-breakdown-line">
+            <span>Pendientes</span>
+            <strong>${item.pending} (${pendingShare}%)</strong>
+          </div>
+        </div>
+      </article>
     `;
   }).join("");
 }
