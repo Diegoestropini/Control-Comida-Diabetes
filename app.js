@@ -1,6 +1,7 @@
 const STORAGE_KEY = "diabetes-control-records-v1";
 const DAILY_METRICS_KEY = "diabetes-control-daily-metrics-v1";
 const DIGESTIVE_EVENTS_KEY = "diabetes-control-digestive-events-v1";
+const STRESS_EVENTS_KEY = "diabetes-control-stress-events-v1";
 const CLOSURE_KEY = "diabetes-control-last-closure";
 
 const DEFAULT_TIMES = {
@@ -17,8 +18,10 @@ const state = {
   records: loadRecords(),
   dailyMetrics: loadDailyMetrics(),
   digestiveEvents: loadDigestiveEvents(),
+  stressEvents: loadStressEvents(),
   showAllDailyMetrics: false,
   showAllDigestiveEvents: false,
+  showAllStressEvents: false,
   showAllHistory: false,
   insightsMonth: "all",
 };
@@ -31,6 +34,7 @@ const elements = {
   insightsGrid: document.getElementById("insights-grid"),
   dailyMetricsBoard: document.getElementById("daily-metrics-board"),
   digestiveEventsBoard: document.getElementById("digestive-events-board"),
+  stressEventsBoard: document.getElementById("stress-events-board"),
   timelineChart: document.getElementById("timeline-chart"),
   mealBreakdown: document.getElementById("meal-breakdown"),
   missingSummary: document.getElementById("missing-summary"),
@@ -46,6 +50,8 @@ const elements = {
   dailyMetricsCancel: document.getElementById("daily-metrics-cancel"),
   digestiveEventSave: document.getElementById("digestive-event-save"),
   digestiveEventMeta: document.getElementById("digestive-event-meta"),
+  stressEventSave: document.getElementById("stress-event-save"),
+  stressEventMeta: document.getElementById("stress-event-meta"),
   filterFrom: document.getElementById("filter-from"),
   filterTo: document.getElementById("filter-to"),
   filterTolerance: document.getElementById("filter-tolerance"),
@@ -446,6 +452,7 @@ function renderStats() {
   renderMissingSummary(stats.missingCount);
   renderDailyMetricsBoard(dailyMetricStats.sortedMetrics);
   renderDigestiveEventsBoard(sortDigestiveEvents(state.digestiveEvents));
+  renderStressEventsBoard(sortStressEvents(state.stressEvents));
 }
 
 function renderInsights(insights, dailyMetrics) {
@@ -882,6 +889,86 @@ function renderDigestiveEventsBoard(events) {
   }
 }
 
+function renderStressEventsBoard(events) {
+  if (!elements.stressEventsBoard) {
+    return;
+  }
+
+  if (!events.length) {
+    elements.stressEventsBoard.innerHTML = '<div class="metric-day-empty">Todavia no hay registros de estres guardados.</div>';
+    return;
+  }
+
+  const visibleEvents = state.showAllStressEvents ? events : events.slice(0, 4);
+  const toggleMarkup = events.length > 4
+    ? `
+      <div class="metric-board-actions">
+        <button class="table-action" data-action="toggle-stress-events" type="button">
+          ${state.showAllStressEvents ? "Mostrar menos" : `Mostrar mas (${events.length - 4} mas)`}
+        </button>
+      </div>
+    `
+    : "";
+
+  elements.stressEventsBoard.innerHTML = visibleEvents.map((event) => `
+    <article class="metric-day-card digestive-event-card">
+      <div class="metric-day-header">
+        <div>
+          <div class="metric-day-date">${formatStressEvent(event.stressLevel)}</div>
+          <div class="metric-day-caption">${formatDateTime(event.recordedAt)}</div>
+        </div>
+        <div class="metric-day-actions">
+          <button class="table-action" data-action="edit-stress-event" data-event-id="${event.id}" type="button">Editar</button>
+          <button class="table-action" data-action="delete-stress-event" data-event-id="${event.id}" type="button">Borrar</button>
+        </div>
+      </div>
+    </article>
+  `).join("") + toggleMarkup;
+
+  elements.stressEventsBoard.querySelectorAll('[data-action="edit-stress-event"]').forEach((button) => {
+    button.addEventListener("click", () => {
+      const event = findStressEventById(button.dataset.eventId);
+      if (!event) {
+        return;
+      }
+
+      const form = elements.dailyMetricsForm;
+      form.dataset.editingStressEventId = event.id;
+      form.elements.stressEvent.value = event.stressLevel;
+      elements.stressEventSave.textContent = "Actualizar estrés";
+      elements.stressEventMeta.textContent = `Editando ${formatStressEvent(event.stressLevel).toLowerCase()} del ${formatDateTime(event.recordedAt)}.`;
+      form.scrollIntoView({ behavior: "smooth", block: "start" });
+      setNotice(`Editando registro de estres del ${formatDateTime(event.recordedAt)}.`);
+    });
+  });
+
+  elements.stressEventsBoard.querySelectorAll('[data-action="delete-stress-event"]').forEach((button) => {
+    button.addEventListener("click", () => {
+      const event = findStressEventById(button.dataset.eventId);
+      if (!event) {
+        return;
+      }
+
+      const confirmed = window.confirm(`Seguro que queres borrar ${formatStressEvent(event.stressLevel).toLowerCase()} del ${formatDateTime(event.recordedAt)}? Esta accion no se puede deshacer.`);
+      if (!confirmed) {
+        return;
+      }
+
+      removeStressEvent(event.id);
+      setNotice(`Registro de estres borrado del ${formatDateTime(event.recordedAt)}.`);
+      renderStats();
+    });
+  });
+
+  const toggleButton = elements.stressEventsBoard.querySelector('[data-action="toggle-stress-events"]');
+  if (toggleButton) {
+    toggleButton.addEventListener("click", () => {
+      state.showAllStressEvents = !state.showAllStressEvents;
+      renderStats();
+    });
+  }
+}
+
 function getFilteredRecords() {
   const from = elements.filterFrom.value;
   const to = elements.filterTo.value;
@@ -1068,6 +1155,12 @@ function exportRecords() {
     digestiveEvents: sortDigestiveEvents(state.digestiveEvents).map((event) => ({
       id: event.id,
       eventType: event.eventType,
+      recordedAt: event.recordedAt,
+      source: event.source,
+    })),
+    stressEvents: sortStressEvents(state.stressEvents).map((event) => ({
+      id: event.id,
+      stressLevel: event.stressLevel,
       recordedAt: event.recordedAt,
       source: event.source,
     })),
@@ -1697,6 +1790,21 @@ function loadDigestiveEvents() {
   }
 }
 
+function loadStressEvents() {
+  try {
+    const raw = localStorage.getItem(STRESS_EVENTS_KEY);
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.map(normalizeStressEvent).filter(Boolean) : [];
+  } catch (error) {
+    console.error("No se pudieron leer los eventos de estres guardados.", error);
+    return [];
+  }
+}
+
 function normalizeRecord(record) {
   if (!record || typeof record !== "object") {
     return null;
@@ -1771,6 +1879,26 @@ function normalizeDigestiveEvent(event) {
   };
 }
 
+function normalizeStressEvent(event) {
+  if (!event || typeof event !== "object") {
+    return null;
+  }
+
+  const stressLevel = event.stressLevel === "yes" ? event.stressLevel : null;
+  const recordedAt = typeof event.recordedAt === "string" ? event.recordedAt : null;
+
+  if (!stressLevel || !recordedAt) {
+    return null;
+  }
+
+  return {
+    id: typeof event.id === "string" ? event.id : createStressEventId(),
+    stressLevel,
+    recordedAt,
+    source: typeof event.source === "string" ? event.source : "manual",
+  };
+}
+
 function persistRecords() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.records));
 }
@@ -1783,6 +1911,10 @@ function persistDigestiveEvents() {
   localStorage.setItem(DIGESTIVE_EVENTS_KEY, JSON.stringify(state.digestiveEvents));
 }
 
+function persistStressEvents() {
+  localStorage.setItem(STRESS_EVENTS_KEY, JSON.stringify(state.stressEvents));
+}
+
 function findDigestiveEventById(eventId) {
   return state.digestiveEvents.find((event) => event.id === eventId) || null;
 }
@@ -1793,6 +1925,18 @@ function removeDigestiveEvent(eventId) {
     clearDigestiveEventEditState();
   }
   persistDigestiveEvents();
+}
+
+function findStressEventById(eventId) {
+  return state.stressEvents.find((event) => event.id === eventId) || null;
+}
+
+function removeStressEvent(eventId) {
+  state.stressEvents = state.stressEvents.filter((event) => event.id !== eventId);
+  if (elements.dailyMetricsForm.dataset.editingStressEventId === eventId) {
+    clearStressEventEditState();
+  }
+  persistStressEvents();
 }
 
 function setNotice(message) {
@@ -1879,6 +2023,16 @@ function formatDateTime(isoString) {
     dateStyle: "short",
     timeStyle: "short",
   }).format(new Date(isoString));
+}
+
+function getLocalTimestamp(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
 }
 
 function getLocalDateKey(date) {
@@ -2200,6 +2354,7 @@ function bindEvents() {
     saveDailyMetric();
   });
   elements.digestiveEventSave.addEventListener("click", saveDigestiveEvent);
+  elements.stressEventSave.addEventListener("click", saveStressEvent);
   elements.dailyMetricsForm.elements.metricDate.addEventListener("input", () => {
     if (!elements.dailyMetricsForm.dataset.editingMetricId) {
       renderDailyMetricsForm();
@@ -2596,6 +2751,38 @@ function saveDigestiveEvent() {
   );
 }
 
+function saveStressEvent() {
+  const form = elements.dailyMetricsForm;
+  const stressLevel = form.elements.stressEvent.value || "";
+  const editingEvent = form.dataset.editingStressEventId ? findStressEventById(form.dataset.editingStressEventId) : null;
+
+  if (!stressLevel) {
+    setNotice("Marca hubo estres para guardar este dato.");
+    return;
+  }
+
+  const timestamp = getLocalTimestamp(new Date());
+  if (editingEvent) {
+    editingEvent.stressLevel = stressLevel;
+    editingEvent.recordedAt = timestamp;
+  } else {
+    state.stressEvents.push({
+      id: createStressEventId(),
+      stressLevel,
+      recordedAt: timestamp,
+      source: "manual",
+    });
+  }
+  persistStressEvents();
+  clearStressEventEditState();
+  renderStats();
+  setNotice(
+    editingEvent
+      ? `${formatStressEvent(stressLevel)} actualizado para ${formatDateTime(timestamp)}.`
+      : `${formatStressEvent(stressLevel)} registrado para ${formatDateTime(timestamp)}.`
+  );
+}
+
 function populateDailyMetricForm(metric) {
   const form = elements.dailyMetricsForm;
   form.dataset.editingMetricId = metric.id;
@@ -2610,6 +2797,7 @@ function clearDailyMetricEditState() {
   form.reset();
   form.elements.metricDate.value = getLocalDateKey(new Date());
   clearDigestiveEventEditState();
+  clearStressEventEditState();
 }
 
 function clearDigestiveEventEditState() {
@@ -2618,6 +2806,14 @@ function clearDigestiveEventEditState() {
   form.elements.digestiveEvent.value = "";
   elements.digestiveEventSave.textContent = "Guardar dato extra";
   elements.digestiveEventMeta.textContent = "Solo se guarda si paso algo. Usa la fecha y hora actual del sistema como marca extra para el JSON.";
+}
+
+function clearStressEventEditState() {
+  const form = elements.dailyMetricsForm;
+  delete form.dataset.editingStressEventId;
+  form.elements.stressEvent.value = "";
+  elements.stressEventSave.textContent = "Guardar estrés";
+  elements.stressEventMeta.textContent = "Se guarda aparte y usa la fecha y hora local exacta del momento del registro.";
 }
 
 function upsertDailyMetric(metric) {
@@ -2683,6 +2879,10 @@ function createDigestiveEventId() {
   return `dig_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function createStressEventId() {
+  return `str_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
 function roundMetric(value) {
   return Math.round(value * 10) / 10;
 }
@@ -2699,7 +2899,19 @@ function formatDigestiveEvent(value) {
   return "Dato extra";
 }
 
+function formatStressEvent(value) {
+  if (value === "yes") {
+    return "Hubo estres";
+  }
+
+  return "Estres";
+}
+
 function sortDigestiveEvents(events) {
+  return [...events].sort((left, right) => right.recordedAt.localeCompare(left.recordedAt));
+}
+
+function sortStressEvents(events) {
   return [...events].sort((left, right) => right.recordedAt.localeCompare(left.recordedAt));
 }
 

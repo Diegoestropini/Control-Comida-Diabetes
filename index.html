@@ -254,6 +254,20 @@
               </div>
             </div>
 
+            <div class="optional-note-block">
+              <label class="optional-inline-field">
+                <span>Estrés</span>
+                <select name="stressEvent">
+                  <option value="">Nada para registrar</option>
+                  <option value="yes">Hubo estrés</option>
+                </select>
+              </label>
+              <p class="hint" id="stress-event-meta">Se guarda aparte y usa la fecha y hora local exacta del momento del registro.</p>
+              <div class="form-actions">
+                <button id="stress-event-save" class="action-button ghost" type="button">Guardar estrés</button>
+              </div>
+            </div>
+
             <div class="form-meta">
               <p class="hint" id="daily-metrics-meta">Este registro es independiente de almuerzo y cena. Puede tener otra fecha y se exporta en JSON.</p>
               <div class="form-actions">
@@ -295,6 +309,10 @@
           <div class="mini-panel neon-summary-mini">
             <h3>Datos extra</h3>
             <div id="digestive-events-board" class="daily-metrics-board"></div>
+          </div>
+          <div class="mini-panel neon-summary-mini">
+            <h3>Estrés</h3>
+            <div id="stress-events-board" class="daily-metrics-board"></div>
           </div>
           <div class="mini-panel neon-summary-mini meal-breakdown-panel">
             <h3>Almuerzo vs cena</h3>
