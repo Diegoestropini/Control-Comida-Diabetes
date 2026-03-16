@@ -343,6 +343,24 @@ label span,
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.optional-note-block {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid rgba(145, 178, 227, 0.1);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.optional-inline-field {
+  grid-template-columns: minmax(0, 220px);
+  justify-content: start;
+}
+
+.optional-inline-field span {
+  font-size: 0.86rem;
+}
+
 .subsection-header {
   display: grid;
   gap: 6px;
@@ -443,6 +461,10 @@ textarea {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.optional-note-block .form-actions {
+  justify-content: flex-start;
 }
 
 .action-button,

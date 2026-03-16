@@ -1,5 +1,6 @@
 const STORAGE_KEY = "diabetes-control-records-v1";
 const DAILY_METRICS_KEY = "diabetes-control-daily-metrics-v1";
+const DIGESTIVE_EVENTS_KEY = "diabetes-control-digestive-events-v1";
 const CLOSURE_KEY = "diabetes-control-last-closure";
 
 const DEFAULT_TIMES = {
@@ -15,7 +16,9 @@ const MEAL_LABELS = {
 const state = {
   records: loadRecords(),
   dailyMetrics: loadDailyMetrics(),
+  digestiveEvents: loadDigestiveEvents(),
   showAllDailyMetrics: false,
+  showAllDigestiveEvents: false,
   showAllHistory: false,
   insightsMonth: "all",
 };
@@ -27,6 +30,7 @@ const elements = {
   dailyMetricsSummary: document.getElementById("daily-metrics-summary"),
   insightsGrid: document.getElementById("insights-grid"),
   dailyMetricsBoard: document.getElementById("daily-metrics-board"),
+  digestiveEventsBoard: document.getElementById("digestive-events-board"),
   timelineChart: document.getElementById("timeline-chart"),
   mealBreakdown: document.getElementById("meal-breakdown"),
   missingSummary: document.getElementById("missing-summary"),
@@ -37,6 +41,8 @@ const elements = {
   dailyMetricsForm: document.getElementById("daily-metrics-form"),
   dailyMetricsMeta: document.getElementById("daily-metrics-meta"),
   dailyMetricsCancel: document.getElementById("daily-metrics-cancel"),
+  digestiveEventSave: document.getElementById("digestive-event-save"),
+  digestiveEventMeta: document.getElementById("digestive-event-meta"),
   filterFrom: document.getElementById("filter-from"),
   filterTo: document.getElementById("filter-to"),
   filterTolerance: document.getElementById("filter-tolerance"),
@@ -395,6 +401,7 @@ function renderStats() {
   renderMealBreakdown(stats.breakdownByMeal, insights.mealComparison || createEmptyMealComparison());
   renderMissingSummary(stats.missingCount);
   renderDailyMetricsBoard(dailyMetricStats.sortedMetrics);
+  renderDigestiveEventsBoard(sortDigestiveEvents(state.digestiveEvents));
 }
 
 function renderInsights(insights, dailyMetrics) {
@@ -751,6 +758,86 @@ function renderDailyMetricsBoard(metrics) {
   }
 }
 
+function renderDigestiveEventsBoard(events) {
+  if (!elements.digestiveEventsBoard) {
+    return;
+  }
+
+  if (!events.length) {
+    elements.digestiveEventsBoard.innerHTML = '<div class="metric-day-empty">Todavia no hay datos extra guardados.</div>';
+    return;
+  }
+
+  const visibleEvents = state.showAllDigestiveEvents ? events : events.slice(0, 4);
+  const toggleMarkup = events.length > 4
+    ? `
+      <div class="metric-board-actions">
+        <button class="table-action" data-action="toggle-digestive-events" type="button">
+          ${state.showAllDigestiveEvents ? "Mostrar menos" : `Mostrar mas (${events.length - 4} mas)`}
+        </button>
+      </div>
+    `
+    : "";
+
+  elements.digestiveEventsBoard.innerHTML = visibleEvents.map((event) => `
+    <article class="metric-day-card digestive-event-card">
+      <div class="metric-day-header">
+        <div>
+          <div class="metric-day-date">${formatDigestiveEvent(event.eventType)}</div>
+          <div class="metric-day-caption">${formatDateTime(event.recordedAt)}</div>
+        </div>
+        <div class="metric-day-actions">
+          <button class="table-action" data-action="edit-digestive-event" data-event-id="${event.id}" type="button">Editar</button>
+          <button class="table-action" data-action="delete-digestive-event" data-event-id="${event.id}" type="button">Borrar</button>
+        </div>
+      </div>
+    </article>
+  `).join("") + toggleMarkup;
+
+  elements.digestiveEventsBoard.querySelectorAll('[data-action="edit-digestive-event"]').forEach((button) => {
+    button.addEventListener("click", () => {
+      const event = findDigestiveEventById(button.dataset.eventId);
+      if (!event) {
+        return;
+      }
+
+      const form = elements.dailyMetricsForm;
+      form.dataset.editingDigestiveEventId = event.id;
+      form.elements.digestiveEvent.value = event.eventType;
+      elements.digestiveEventSave.textContent = "Actualizar dato extra";
+      elements.digestiveEventMeta.textContent = `Editando ${formatDigestiveEvent(event.eventType).toLowerCase()} del ${formatDateTime(event.recordedAt)}.`;
+      form.scrollIntoView({ behavior: "smooth", block: "start" });
+      setNotice(`Editando dato extra del ${formatDateTime(event.recordedAt)}.`);
+    });
+  });
+
+  elements.digestiveEventsBoard.querySelectorAll('[data-action="delete-digestive-event"]').forEach((button) => {
+    button.addEventListener("click", () => {
+      const event = findDigestiveEventById(button.dataset.eventId);
+      if (!event) {
+        return;
+      }
+
+      const confirmed = window.confirm(`Seguro que queres borrar ${formatDigestiveEvent(event.eventType).toLowerCase()} del ${formatDateTime(event.recordedAt)}? Esta accion no se puede deshacer.`);
+      if (!confirmed) {
+        return;
+      }
+
+      removeDigestiveEvent(event.id);
+      setNotice(`Dato extra borrado del ${formatDateTime(event.recordedAt)}.`);
+      renderStats();
+    });
+  });
+
+  const toggleButton = elements.digestiveEventsBoard.querySelector('[data-action="toggle-digestive-events"]');
+  if (toggleButton) {
+    toggleButton.addEventListener("click", () => {
+      state.showAllDigestiveEvents = !state.showAllDigestiveEvents;
+      renderStats();
+    });
+  }
+}
+
 function getFilteredRecords() {
   const from = elements.filterFrom.value;
   const to = elements.filterTo.value;
@@ -933,6 +1020,12 @@ function exportRecords() {
       averageGlucose: metric.averageGlucose,
       createdAt: metric.createdAt,
       updatedAt: metric.updatedAt,
+    })),
+    digestiveEvents: sortDigestiveEvents(state.digestiveEvents).map((event) => ({
+      id: event.id,
+      eventType: event.eventType,
+      recordedAt: event.recordedAt,
+      source: event.source,
     })),
   };
 
@@ -1545,6 +1638,21 @@ function loadDailyMetrics() {
   }
 }
 
+function loadDigestiveEvents() {
+  try {
+    const raw = localStorage.getItem(DIGESTIVE_EVENTS_KEY);
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.map(normalizeDigestiveEvent).filter(Boolean) : [];
+  } catch (error) {
+    console.error("No se pudieron leer los eventos digestivos guardados.", error);
+    return [];
+  }
+}
+
 function normalizeRecord(record) {
   if (!record || typeof record !== "object") {
     return null;
@@ -1599,12 +1707,48 @@ function normalizeDailyMetric(metric) {
   };
 }
 
+function normalizeDigestiveEvent(event) {
+  if (!event || typeof event !== "object") {
+    return null;
+  }
+
+  const eventType = event.eventType === "constipation" || event.eventType === "diarrhea" ? event.eventType : null;
+  const recordedAt = typeof event.recordedAt === "string" ? event.recordedAt : null;
+
+  if (!eventType || !recordedAt) {
+    return null;
+  }
+
+  return {
+    id: typeof event.id === "string" ? event.id : createDigestiveEventId(),
+    eventType,
+    recordedAt,
+    source: typeof event.source === "string" ? event.source : "manual",
+  };
+}
+
 function persistRecords() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.records));
 }
 
 function persistDailyMetrics() {
   localStorage.setItem(DAILY_METRICS_KEY, JSON.stringify(state.dailyMetrics));
+}
+
+function persistDigestiveEvents() {
+  localStorage.setItem(DIGESTIVE_EVENTS_KEY, JSON.stringify(state.digestiveEvents));
+}
+
+function findDigestiveEventById(eventId) {
+  return state.digestiveEvents.find((event) => event.id === eventId) || null;
+}
+
+function removeDigestiveEvent(eventId) {
+  state.digestiveEvents = state.digestiveEvents.filter((event) => event.id !== eventId);
+  if (elements.dailyMetricsForm.dataset.editingDigestiveEventId === eventId) {
+    clearDigestiveEventEditState();
+  }
+  persistDigestiveEvents();
 }
 
 function setNotice(message) {
@@ -2011,6 +2155,7 @@ function bindEvents() {
     event.preventDefault();
     saveDailyMetric();
   });
+  elements.digestiveEventSave.addEventListener("click", saveDigestiveEvent);
   elements.dailyMetricsForm.elements.metricDate.addEventListener("input", () => {
     if (!elements.dailyMetricsForm.dataset.editingMetricId) {
       renderDailyMetricsForm();
@@ -2371,6 +2516,38 @@ function saveDailyMetric() {
   );
 }
 
+function saveDigestiveEvent() {
+  const form = elements.dailyMetricsForm;
+  const eventType = form.elements.digestiveEvent.value || "";
+  const editingEvent = form.dataset.editingDigestiveEventId ? findDigestiveEventById(form.dataset.editingDigestiveEventId) : null;
+
+  if (!eventType) {
+    setNotice("Elegi estrenimiento o diarrea para guardar el dato extra.");
+    return;
+  }
+
+  const timestamp = new Date().toISOString();
+  if (editingEvent) {
+    editingEvent.eventType = eventType;
+    editingEvent.recordedAt = timestamp;
+  } else {
+    state.digestiveEvents.push({
+      id: createDigestiveEventId(),
+      eventType,
+      recordedAt: timestamp,
+      source: "manual",
+    });
+  }
+  persistDigestiveEvents();
+  clearDigestiveEventEditState();
+  renderStats();
+  setNotice(
+    editingEvent
+      ? `${formatDigestiveEvent(eventType)} actualizado para ${formatDateTime(timestamp)}.`
+      : `${formatDigestiveEvent(eventType)} registrado como dato extra para ${formatDateTime(timestamp)}.`
+  );
+}
+
 function populateDailyMetricForm(metric) {
   const form = elements.dailyMetricsForm;
   form.dataset.editingMetricId = metric.id;
@@ -2384,6 +2561,15 @@ function clearDailyMetricEditState() {
   delete form.dataset.editingMetricId;
   form.reset();
   form.elements.metricDate.value = getLocalDateKey(new Date());
+  clearDigestiveEventEditState();
+}
+
+function clearDigestiveEventEditState() {
+  const form = elements.dailyMetricsForm;
+  delete form.dataset.editingDigestiveEventId;
+  form.elements.digestiveEvent.value = "";
+  elements.digestiveEventSave.textContent = "Guardar dato extra";
+  elements.digestiveEventMeta.textContent = "Solo se guarda si paso algo. Usa la fecha y hora actual del sistema como marca extra para el JSON.";
 }
 
 function upsertDailyMetric(metric) {
@@ -2445,8 +2631,28 @@ function createMetricId() {
   return `met_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function createDigestiveEventId() {
+  return `dig_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
 function roundMetric(value) {
   return Math.round(value * 10) / 10;
+}
+
+function formatDigestiveEvent(value) {
+  if (value === "constipation") {
+    return "Estrenimiento";
+  }
+
+  if (value === "diarrhea") {
+    return "Diarrea";
+  }
+
+  return "Dato extra";
+}
+
+function sortDigestiveEvents(events) {
+  return [...events].sort((left, right) => right.recordedAt.localeCompare(left.recordedAt));
 }
 
 function formatPercentage(value) {
