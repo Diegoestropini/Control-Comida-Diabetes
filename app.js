@@ -38,6 +38,9 @@ const elements = {
   historyMoreShell: document.getElementById("history-more-shell"),
   exportButton: document.getElementById("export-button"),
   forceCloseButton: document.getElementById("force-close-button"),
+  glucoseStart: document.getElementById("glucose-start"),
+  glucoseEnd: document.getElementById("glucose-end"),
+  glucoseCalculatorResult: document.getElementById("glucose-calculator-result"),
   dailyMetricsForm: document.getElementById("daily-metrics-form"),
   dailyMetricsMeta: document.getElementById("daily-metrics-meta"),
   dailyMetricsCancel: document.getElementById("daily-metrics-cancel"),
@@ -79,7 +82,42 @@ function initialize() {
   runDailyClosure();
   bindEvents();
   closeRecordModal();
+  updateGlucoseCalculator();
   render();
+}
+
+function updateGlucoseCalculator() {
+  const start = Number(elements.glucoseStart.value);
+  const end = Number(elements.glucoseEnd.value);
+  const result = elements.glucoseCalculatorResult;
+
+  if (!Number.isFinite(start) || !Number.isFinite(end)) {
+    result.className = "glucose-calculator-result tone-neutral";
+    result.innerHTML = "<strong>Esperando valores</strong><span>Esta calculadora solo muestra el detalle del pico y no guarda datos.</span>";
+    return;
+  }
+
+  const difference = end - start;
+
+  if (difference <= 0) {
+    result.className = "glucose-calculator-result tone-neutral";
+    result.innerHTML = `<strong>Sin subida</strong><span>La diferencia es de ${Math.abs(difference)} mg/dL. No se detecta un pico positivo.</span>`;
+    return;
+  }
+
+  let tone = "tone-green";
+  let label = "Subida estable";
+
+  if (difference > 100) {
+    tone = "tone-red";
+    label = "Pico alto";
+  } else if (difference >= 61) {
+    tone = "tone-yellow";
+    label = "Pico moderado";
+  }
+
+  result.className = `glucose-calculator-result ${tone}`;
+  result.innerHTML = `<strong>${label}: +${difference} mg/dL</strong><span>Inicial ${start} mg/dL, final ${end} mg/dL.</span>`;
 }
 
 function bindEvents() {
@@ -140,6 +178,12 @@ function bindEvents() {
       setNotice("Se ejecutó el cierre manual para hoy. No había faltantes vencidos para crear.");
     }
     render();
+  });
+  [elements.glucoseStart, elements.glucoseEnd].forEach((input) => {
+    input.addEventListener("input", updateGlucoseCalculator);
+  });
+  [elements.glucoseStart, elements.glucoseEnd].forEach((input) => {
+    input.addEventListener("input", updateGlucoseCalculator);
   });
 
   [elements.filterFrom, elements.filterTo, elements.filterTolerance].forEach((control) => {
@@ -2208,6 +2252,10 @@ function bindEvents() {
     runDailyClosure({ forceDateKey: getLocalDateKey(new Date()) });
     setNotice("Se ejecutó el cierre diario manualmente para hoy.");
     render();
+  });
+
+  [elements.glucoseStart, elements.glucoseEnd].forEach((input) => {
+    input.addEventListener("input", updateGlucoseCalculator);
   });
 
   [elements.filterFrom, elements.filterTo, elements.filterTolerance].forEach((control) => {

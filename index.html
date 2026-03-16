@@ -23,6 +23,29 @@
         <button id="quick-entry-button" class="action-button primary" type="button">Registro rapido</button>
         <button id="export-button" class="action-button secondary" type="button">Exportar JSON</button>
         <button id="force-close-button" class="action-button ghost" type="button">Cerrar día ahora</button>
+        <section class="glucose-calculator" aria-labelledby="glucose-calculator-title">
+          <div class="glucose-calculator-header">
+            <div>
+              <p class="panel-kicker">Ayuda visual</p>
+              <h2 id="glucose-calculator-title">Calculadora de pico</h2>
+            </div>
+            <span class="meal-badge metrics">Sin registro</span>
+          </div>
+          <div class="glucose-calculator-grid">
+            <label>
+              <span>Glucosa inicial</span>
+              <input id="glucose-start" type="number" min="0" max="600" step="1" placeholder="Ejemplo: 110">
+            </label>
+            <label>
+              <span>Glucosa final</span>
+              <input id="glucose-end" type="number" min="0" max="600" step="1" placeholder="Ejemplo: 180">
+            </label>
+          </div>
+          <div id="glucose-calculator-result" class="glucose-calculator-result tone-neutral">
+            <strong>Esperando valores</strong>
+            <span>Esta calculadora solo muestra el detalle del pico y no guarda datos.</span>
+          </div>
+        </section>
       </div>
     </header>
 
