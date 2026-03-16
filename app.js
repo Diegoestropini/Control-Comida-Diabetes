@@ -151,10 +151,16 @@ function saveMealRecord(mealType) {
   const markMissing = form.elements.markMissing.checked;
   const mealText = form.elements.mealText.value.trim();
   const existingRecord = editingRecord || findRecordForDate(recordDate, mealType);
+  const conflictingRecord = findRecordConflict(recordDate, mealType, editingRecord?.id || "");
   const timestamp = now.toISOString();
 
   if (!markMissing && !mealText) {
     setNotice(`Escribí el ${MEAL_LABELS[mealType].toLowerCase()} completo o marcá “no registró nada”.`);
+    return;
+  }
+
+  if (conflictingRecord) {
+    setNotice(`Ya existe un ${MEAL_LABELS[mealType].toLowerCase()} para ${formatDate(recordDate)}. ElegÃ­ otra fecha o editÃ¡ ese registro desde el historial.`);
     return;
   }
 
@@ -165,6 +171,8 @@ function saveMealRecord(mealType) {
     createdAt: timestamp,
   };
 
+  record.mealType = mealType;
+  record.recordDate = recordDate;
   record.scheduledTime = scheduledTime;
   record.status = markMissing ? "missing" : "recorded";
   record.mealText = markMissing ? "No registró nada" : mealText;
@@ -1608,6 +1616,15 @@ function clearEditState(form) {
   delete form.dataset.editingRecordId;
 }
 
+function findRecordConflict(recordDate, mealType, ignoredRecordId = "") {
+  const record = findRecordForDate(recordDate, mealType);
+  if (!record || record.id === ignoredRecordId) {
+    return null;
+  }
+
+  return record;
+}
+
 function getActiveMealRecordDate(mealType) {
   const form = elements.forms[mealType];
   if (!form) {
@@ -1817,6 +1834,7 @@ function saveMealRecord(mealType) {
   const markMissing = form.elements.markMissing.checked;
   const mealText = form.elements.mealText.value.trim();
   const existingRecord = editingRecord || findRecordForDate(recordDate, mealType);
+  const conflictingRecord = findRecordConflict(recordDate, mealType, editingRecord?.id || "");
   const timestamp = now.toISOString();
 
   if (!markMissing && !mealText) {
@@ -2562,4 +2580,481 @@ function getReadableTextColor(hex) {
 
 function currentMealType() {
   return new Date().getHours() < 18 ? "lunch" : "dinner";
+}
+
+function getModalRecordForSelection(dateKey, mealType) {
+  const modal = getModalUI();
+  const editingRecordId = modal.shell.dataset.editingRecordId || "";
+  const editingRecord = editingRecordId ? findRecordById(editingRecordId) : null;
+
+  if (editingRecord && editingRecord.recordDate === dateKey && editingRecord.mealType === mealType) {
+    return editingRecord;
+  }
+
+  return findRecordForDate(dateKey, mealType);
+}
+
+function saveMealRecord(mealType) {
+  const form = elements.forms[mealType];
+  const now = new Date();
+  const editingRecordId = form.dataset.editingRecordId || "";
+  const editingRecord = editingRecordId ? findRecordById(editingRecordId) : null;
+  const recordDate = form.elements.recordDate.value || editingRecord?.recordDate || getLocalDateKey(now);
+  const scheduledTime = form.elements.scheduledTime.value || DEFAULT_TIMES[mealType];
+  const markMissing = form.elements.markMissing.checked;
+  const mealText = form.elements.mealText.value.trim();
+  const existingRecord = editingRecord || findRecordForDate(recordDate, mealType);
+  const conflictingRecord = findRecordConflict(recordDate, mealType, editingRecord?.id || "");
+  const timestamp = now.toISOString();
+
+  if (!markMissing && !mealText) {
+    setNotice(`EscribÃ­ el ${MEAL_LABELS[mealType].toLowerCase()} completo o marcÃ¡ â€œno registrÃ³ nadaâ€.`);
+    return;
+  }
+
+  if (conflictingRecord) {
+    setNotice(`Ya existe un ${MEAL_LABELS[mealType].toLowerCase()} para ${formatDate(recordDate)}. ElegÃ­ otra fecha o editÃ¡ ese registro desde el historial.`);
+    return;
+  }
+
+  const record = existingRecord || {
+    id: createRecordId(),
+    mealType,
+    recordDate,
+    createdAt: timestamp,
+  };
+
+  record.mealType = mealType;
+  record.recordDate = recordDate;
+  record.scheduledTime = scheduledTime;
+  record.status = markMissing ? "missing" : "recorded";
+  record.mealText = markMissing ? "No registrÃ³ nada" : mealText;
+  record.tolerance = markMissing ? null : existingRecord?.tolerance ?? null;
+  record.toleranceUpdatedAt = markMissing ? null : existingRecord?.toleranceUpdatedAt ?? null;
+  record.updatedAt = timestamp;
+  record.createdAt = existingRecord ? existingRecord.createdAt : timestamp;
+
+  upsertRecord(record);
+  clearEditState(form);
+  form.reset();
+
+  setNotice(
+    existingRecord
+      ? `${MEAL_LABELS[mealType]} actualizado para ${formatDate(recordDate)}.`
+      : `${MEAL_LABELS[mealType]} guardado para ${formatDate(recordDate)}.`
+  );
+
+  render();
+}
+
+function renderForms() {
+  const todayKey = getLocalDateKey(new Date());
+
+  ["lunch", "dinner"].forEach((mealType) => {
+    const form = elements.forms[mealType];
+    if (form.dataset.editingRecordId) {
+      const editingRecord = findRecordById(form.dataset.editingRecordId);
+      if (editingRecord) {
+        form.elements.recordDate.value = editingRecord.recordDate;
+        form.elements.scheduledTime.value = editingRecord.scheduledTime;
+        form.elements.markMissing.checked = false;
+        form.elements.mealText.disabled = false;
+        form.elements.mealText.value = editingRecord.status === "missing" ? "" : editingRecord.mealText;
+        elements.formMeta[mealType].textContent = `Editando registro del ${formatDate(editingRecord.recordDate)}.`;
+      } else {
+        clearEditState(form);
+        hydrateMealFormForDate(mealType, form.elements.recordDate.value || todayKey);
+      }
+    } else {
+      const selectedDate = form.elements.recordDate.value || todayKey;
+      hydrateMealFormForDate(mealType, selectedDate);
+    }
+  });
+
+  ["lunch", "dinner"].forEach((mealType) => {
+    const form = elements.toleranceForms[mealType];
+    const editingRecord = form.dataset.editingRecordId ? findRecordById(form.dataset.editingRecordId) : null;
+    const activeDate = getActiveMealRecordDate(mealType) || todayKey;
+    const record = editingRecord || findRecordForDate(activeDate, mealType);
+    const selectedTolerance = record?.tolerance || "verde";
+    const radio = form.querySelector(`input[name="tolerance"][value="${selectedTolerance}"]`);
+
+    if (radio) {
+      radio.checked = true;
+    }
+
+    elements.toleranceMeta[mealType].textContent = getToleranceMeta(record, Boolean(editingRecord));
+  });
+}
+
+function openRecordModal({ record = null, dateKey = "", mealType = "lunch", section = "meal" }) {
+  const modal = getModalUI();
+  const targetDate = record?.recordDate || dateKey || getLocalDateKey(new Date());
+  const targetMealType = record?.mealType || mealType;
+  modal.shell.hidden = false;
+  modal.shell.dataset.section = section;
+  modal.shell.dataset.editingRecordId = record?.id || "";
+  hydrateRecordModal(targetDate, targetMealType);
+  if (section === "tolerance") {
+    modal.toleranceForm.scrollIntoView({ block: "nearest" });
+  }
+}
+
+function closeRecordModal() {
+  const modal = getModalUI();
+  modal.shell.hidden = true;
+  delete modal.shell.dataset.editingRecordId;
+  modal.notice.textContent = "";
+  modal.notice.classList.remove("is-visible");
+}
+
+function hydrateRecordModal(dateKey, mealType) {
+  const modal = getModalUI();
+  const mealForm = modal.mealForm;
+  const toleranceForm = modal.toleranceForm;
+  const record = getModalRecordForSelection(dateKey, mealType);
+  const isMissing = record?.status === "missing";
+  const selectedTolerance = record?.tolerance || "verde";
+
+  mealForm.elements.recordDate.value = dateKey;
+  mealForm.elements.mealType.value = mealType;
+  mealForm.elements.scheduledTime.value = record?.scheduledTime || DEFAULT_TIMES[mealType];
+  mealForm.elements.markMissing.checked = false;
+  mealForm.elements.mealText.disabled = false;
+  mealForm.elements.mealText.value = isMissing ? "" : record?.mealText || "";
+
+  const toleranceRadio = toleranceForm.querySelector(`input[name="tolerance"][value="${selectedTolerance}"]`);
+  if (toleranceRadio) {
+    toleranceRadio.checked = true;
+  }
+
+  if (record?.status === "missing") {
+    modal.notice.textContent = `${MEAL_LABELS[mealType]} de ${formatDate(dateKey)} quedÃ³ como â€œno registrÃ³ nadaâ€. PodÃ©s cargar la comida ahora.`;
+    modal.notice.classList.add("is-visible");
+  } else {
+    modal.notice.textContent = "";
+    modal.notice.classList.remove("is-visible");
+  }
+
+  refreshModalMeta();
+}
+
+function refreshModalMeta() {
+  const modal = getModalUI();
+  const dateKey = modal.mealForm.elements.recordDate.value;
+  const mealType = modal.mealForm.elements.mealType.value;
+  const editingRecordId = modal.shell.dataset.editingRecordId || "";
+  const record = getModalRecordForSelection(dateKey, mealType);
+  const conflictingRecord = editingRecordId ? findRecordConflict(dateKey, mealType, editingRecordId) : null;
+  const isMissing = record?.status === "missing";
+  const mealTypeLabel = MEAL_LABELS[mealType].toLowerCase();
+
+  if (conflictingRecord) {
+    modal.mealMeta.textContent = `Ya existe un ${mealTypeLabel} para ${formatDate(dateKey)}. Guardar acÃ¡ generarÃ­a un conflicto, asÃ­ que ese cambio queda bloqueado.`;
+  } else if (record) {
+    modal.mealMeta.textContent = isMissing
+      ? `Ese ${mealTypeLabel} faltaba. Esta ventana te deja reemplazarlo sin ir al formulario principal.`
+      : `Ya existe un registro para ${formatDate(dateKey)}. Si guardÃ¡s, se actualizarÃ¡.`;
+  } else {
+    modal.mealMeta.textContent = "PodÃ©s completar o corregir registros viejos desde esta ventana.";
+  }
+
+  if (!record) {
+    modal.toleranceMeta.textContent = `Primero guardÃ¡ el ${mealTypeLabel}. DespuÃ©s podÃ©s registrar su tolerancia acÃ¡ mismo.`;
+    return;
+  }
+
+  if (record.status === "missing") {
+    modal.toleranceMeta.textContent = "Ese registro estÃ¡ marcado como â€œno registrÃ³ nadaâ€. CargÃ¡ la comida primero.";
+    return;
+  }
+
+  if (!record.tolerance) {
+    modal.toleranceMeta.textContent = "Tolerancia pendiente. PodÃ©s cargarla ahora.";
+    return;
+  }
+
+  modal.toleranceMeta.textContent = `Tolerancia actual: ${capitalize(record.tolerance)}. Ãšltima actualizaciÃ³n ${formatDateTime(record.toleranceUpdatedAt || record.updatedAt)}.`;
+}
+
+function saveModalMeal() {
+  const modal = getModalUI();
+  const now = new Date();
+  const recordDate = modal.mealForm.elements.recordDate.value || getLocalDateKey(now);
+  const mealType = modal.mealForm.elements.mealType.value;
+  const scheduledTime = modal.mealForm.elements.scheduledTime.value || DEFAULT_TIMES[mealType];
+  const markMissing = modal.mealForm.elements.markMissing.checked;
+  const mealText = modal.mealForm.elements.mealText.value.trim();
+  const editingRecordId = modal.shell.dataset.editingRecordId || "";
+  const editingRecord = editingRecordId ? findRecordById(editingRecordId) : null;
+  const existingRecord = editingRecord || findRecordForDate(recordDate, mealType);
+  const conflictingRecord = findRecordConflict(recordDate, mealType, editingRecord?.id || "");
+  const timestamp = now.toISOString();
+
+  if (!markMissing && !mealText) {
+    modal.notice.textContent = `EscribÃ­ el ${MEAL_LABELS[mealType].toLowerCase()} completo o marcÃ¡ â€œno registrÃ³ nadaâ€.`;
+    modal.notice.classList.add("is-visible");
+    return;
+  }
+
+  if (conflictingRecord) {
+    modal.notice.textContent = `Ya existe un ${MEAL_LABELS[mealType].toLowerCase()} para ${formatDate(recordDate)}. No se puede mover este registro a una fecha ocupada.`;
+    modal.notice.classList.add("is-visible");
+    return;
+  }
+
+  const record = existingRecord || {
+    id: createRecordId(),
+    mealType,
+    recordDate,
+    createdAt: timestamp,
+  };
+
+  record.mealType = mealType;
+  record.recordDate = recordDate;
+  record.scheduledTime = scheduledTime;
+  record.status = markMissing ? "missing" : "recorded";
+  record.mealText = markMissing ? "No registrÃ³ nada" : mealText;
+  record.tolerance = markMissing ? null : existingRecord?.tolerance ?? null;
+  record.toleranceUpdatedAt = markMissing ? null : existingRecord?.toleranceUpdatedAt ?? null;
+  record.updatedAt = timestamp;
+  record.createdAt = existingRecord ? existingRecord.createdAt : timestamp;
+
+  upsertRecord(record);
+  modal.shell.dataset.editingRecordId = record.id;
+  modal.notice.textContent = `${MEAL_LABELS[mealType]} ${existingRecord ? "actualizado" : "guardado"} para ${formatDate(recordDate)}.`;
+  modal.notice.classList.add("is-visible");
+  hydrateRecordModal(recordDate, mealType);
+  render();
+}
+
+function saveModalTolerance() {
+  const modal = getModalUI();
+  const recordDate = modal.mealForm.elements.recordDate.value;
+  const mealType = modal.mealForm.elements.mealType.value;
+  const record = getModalRecordForSelection(recordDate, mealType);
+
+  if (!record) {
+    modal.notice.textContent = `Primero guardÃ¡ el ${MEAL_LABELS[mealType].toLowerCase()} antes de registrar tolerancia.`;
+    modal.notice.classList.add("is-visible");
+    return;
+  }
+
+  if (record.status === "missing") {
+    modal.notice.textContent = "Ese registro estÃ¡ marcado como â€œno registrÃ³ nadaâ€. CargÃ¡ la comida primero.";
+    modal.notice.classList.add("is-visible");
+    return;
+  }
+
+  record.tolerance = modal.toleranceForm.elements.tolerance.value;
+  record.toleranceUpdatedAt = new Date().toISOString();
+  record.updatedAt = record.toleranceUpdatedAt;
+  upsertRecord(record);
+
+  modal.notice.textContent = `Tolerancia de ${MEAL_LABELS[mealType].toLowerCase()} actualizada para ${formatDate(recordDate)}.`;
+  modal.notice.classList.add("is-visible");
+  hydrateRecordModal(recordDate, mealType);
+  render();
+}
+
+function saveMealRecord(mealType) {
+  const form = elements.forms[mealType];
+  const now = new Date();
+  const editingRecordId = form.dataset.editingRecordId || "";
+  const editingRecord = editingRecordId ? findRecordById(editingRecordId) : null;
+  const recordDate = form.elements.recordDate.value || editingRecord?.recordDate || getLocalDateKey(now);
+  const scheduledTime = form.elements.scheduledTime.value || DEFAULT_TIMES[mealType];
+  const markMissing = form.elements.markMissing.checked;
+  const mealText = form.elements.mealText.value.trim();
+  const existingRecord = editingRecord || findRecordForDate(recordDate, mealType);
+  const conflictingRecord = findRecordConflict(recordDate, mealType, editingRecord?.id || "");
+  const timestamp = now.toISOString();
+
+  if (!markMissing && !mealText) {
+    setNotice(`Escribi el ${MEAL_LABELS[mealType].toLowerCase()} completo o marca "no registro nada".`);
+    return;
+  }
+
+  if (conflictingRecord) {
+    setNotice(`Ya existe un ${MEAL_LABELS[mealType].toLowerCase()} para ${formatDate(recordDate)}. Elegi otra fecha o edita ese registro desde el historial.`);
+    return;
+  }
+
+  const record = existingRecord || {
+    id: createRecordId(),
+    mealType,
+    recordDate,
+    createdAt: timestamp,
+  };
+
+  record.mealType = mealType;
+  record.recordDate = recordDate;
+  record.scheduledTime = scheduledTime;
+  record.status = markMissing ? "missing" : "recorded";
+  record.mealText = markMissing ? "No registro nada" : mealText;
+  record.tolerance = markMissing ? null : existingRecord?.tolerance ?? null;
+  record.toleranceUpdatedAt = markMissing ? null : existingRecord?.toleranceUpdatedAt ?? null;
+  record.updatedAt = timestamp;
+  record.createdAt = existingRecord ? existingRecord.createdAt : timestamp;
+
+  upsertRecord(record);
+  clearEditState(form);
+  form.reset();
+
+  setNotice(
+    existingRecord
+      ? `${MEAL_LABELS[mealType]} actualizado para ${formatDate(recordDate)}.`
+      : `${MEAL_LABELS[mealType]} guardado para ${formatDate(recordDate)}.`
+  );
+
+  render();
+}
+
+function hydrateRecordModal(dateKey, mealType) {
+  const modal = getModalUI();
+  const mealForm = modal.mealForm;
+  const toleranceForm = modal.toleranceForm;
+  const record = getModalRecordForSelection(dateKey, mealType);
+  const isMissing = record?.status === "missing";
+  const selectedTolerance = record?.tolerance || "verde";
+
+  mealForm.elements.recordDate.value = dateKey;
+  mealForm.elements.mealType.value = mealType;
+  mealForm.elements.scheduledTime.value = record?.scheduledTime || DEFAULT_TIMES[mealType];
+  mealForm.elements.markMissing.checked = false;
+  mealForm.elements.mealText.disabled = false;
+  mealForm.elements.mealText.value = isMissing ? "" : record?.mealText || "";
+
+  const toleranceRadio = toleranceForm.querySelector(`input[name="tolerance"][value="${selectedTolerance}"]`);
+  if (toleranceRadio) {
+    toleranceRadio.checked = true;
+  }
+
+  if (record?.status === "missing") {
+    modal.notice.textContent = `${MEAL_LABELS[mealType]} de ${formatDate(dateKey)} quedo como "no registro nada". Podes cargar la comida ahora.`;
+    modal.notice.classList.add("is-visible");
+  } else {
+    modal.notice.textContent = "";
+    modal.notice.classList.remove("is-visible");
+  }
+
+  refreshModalMeta();
+}
+
+function refreshModalMeta() {
+  const modal = getModalUI();
+  const dateKey = modal.mealForm.elements.recordDate.value;
+  const mealType = modal.mealForm.elements.mealType.value;
+  const editingRecordId = modal.shell.dataset.editingRecordId || "";
+  const record = getModalRecordForSelection(dateKey, mealType);
+  const conflictingRecord = editingRecordId ? findRecordConflict(dateKey, mealType, editingRecordId) : null;
+  const isMissing = record?.status === "missing";
+  const mealTypeLabel = MEAL_LABELS[mealType].toLowerCase();
+
+  if (conflictingRecord) {
+    modal.mealMeta.textContent = `Ya existe un ${mealTypeLabel} para ${formatDate(dateKey)}. Guardar aca generaria un conflicto, asi que ese cambio queda bloqueado.`;
+  } else if (record) {
+    modal.mealMeta.textContent = isMissing
+      ? `Ese ${mealTypeLabel} faltaba. Esta ventana te deja reemplazarlo sin ir al formulario principal.`
+      : `Ya existe un registro para ${formatDate(dateKey)}. Si guardas, se actualizara.`;
+  } else {
+    modal.mealMeta.textContent = "Podes completar o corregir registros viejos desde esta ventana.";
+  }
+
+  if (!record) {
+    modal.toleranceMeta.textContent = `Primero guarda el ${mealTypeLabel}. Despues podes registrar su tolerancia aca mismo.`;
+    return;
+  }
+
+  if (record.status === "missing") {
+    modal.toleranceMeta.textContent = "Ese registro esta marcado como \"no registro nada\". Carga la comida primero.";
+    return;
+  }
+
+  if (!record.tolerance) {
+    modal.toleranceMeta.textContent = "Tolerancia pendiente. Podes cargarla ahora.";
+    return;
+  }
+
+  modal.toleranceMeta.textContent = `Tolerancia actual: ${capitalize(record.tolerance)}. Ultima actualizacion ${formatDateTime(record.toleranceUpdatedAt || record.updatedAt)}.`;
+}
+
+function saveModalMeal() {
+  const modal = getModalUI();
+  const now = new Date();
+  const recordDate = modal.mealForm.elements.recordDate.value || getLocalDateKey(now);
+  const mealType = modal.mealForm.elements.mealType.value;
+  const scheduledTime = modal.mealForm.elements.scheduledTime.value || DEFAULT_TIMES[mealType];
+  const markMissing = modal.mealForm.elements.markMissing.checked;
+  const mealText = modal.mealForm.elements.mealText.value.trim();
+  const editingRecordId = modal.shell.dataset.editingRecordId || "";
+  const editingRecord = editingRecordId ? findRecordById(editingRecordId) : null;
+  const existingRecord = editingRecord || findRecordForDate(recordDate, mealType);
+  const conflictingRecord = findRecordConflict(recordDate, mealType, editingRecord?.id || "");
+  const timestamp = now.toISOString();
+
+  if (!markMissing && !mealText) {
+    modal.notice.textContent = `Escribi el ${MEAL_LABELS[mealType].toLowerCase()} completo o marca "no registro nada".`;
+    modal.notice.classList.add("is-visible");
+    return;
+  }
+
+  if (conflictingRecord) {
+    modal.notice.textContent = `Ya existe un ${MEAL_LABELS[mealType].toLowerCase()} para ${formatDate(recordDate)}. No se puede mover este registro a una fecha ocupada.`;
+    modal.notice.classList.add("is-visible");
+    return;
+  }
+
+  const record = existingRecord || {
+    id: createRecordId(),
+    mealType,
+    recordDate,
+    createdAt: timestamp,
+  };
+
+  record.mealType = mealType;
+  record.recordDate = recordDate;
+  record.scheduledTime = scheduledTime;
+  record.status = markMissing ? "missing" : "recorded";
+  record.mealText = markMissing ? "No registro nada" : mealText;
+  record.tolerance = markMissing ? null : existingRecord?.tolerance ?? null;
+  record.toleranceUpdatedAt = markMissing ? null : existingRecord?.toleranceUpdatedAt ?? null;
+  record.updatedAt = timestamp;
+  record.createdAt = existingRecord ? existingRecord.createdAt : timestamp;
+
+  upsertRecord(record);
+  modal.shell.dataset.editingRecordId = record.id;
+  modal.notice.textContent = `${MEAL_LABELS[mealType]} ${existingRecord ? "actualizado" : "guardado"} para ${formatDate(recordDate)}.`;
+  modal.notice.classList.add("is-visible");
+  hydrateRecordModal(recordDate, mealType);
+  render();
+}
+
+function saveModalTolerance() {
+  const modal = getModalUI();
+  const recordDate = modal.mealForm.elements.recordDate.value;
+  const mealType = modal.mealForm.elements.mealType.value;
+  const record = getModalRecordForSelection(recordDate, mealType);
+
+  if (!record) {
+    modal.notice.textContent = `Primero guarda el ${MEAL_LABELS[mealType].toLowerCase()} antes de registrar tolerancia.`;
+    modal.notice.classList.add("is-visible");
+    return;
+  }
+
+  if (record.status === "missing") {
+    modal.notice.textContent = "Ese registro esta marcado como \"no registro nada\". Carga la comida primero.";
+    modal.notice.classList.add("is-visible");
+    return;
+  }
+
+  record.tolerance = modal.toleranceForm.elements.tolerance.value;
+  record.toleranceUpdatedAt = new Date().toISOString();
+  record.updatedAt = record.toleranceUpdatedAt;
+  upsertRecord(record);
+
+  modal.notice.textContent = `Tolerancia de ${MEAL_LABELS[mealType].toLowerCase()} actualizada para ${formatDate(recordDate)}.`;
+  modal.notice.classList.add("is-visible");
+  hydrateRecordModal(recordDate, mealType);
+  render();
 }
