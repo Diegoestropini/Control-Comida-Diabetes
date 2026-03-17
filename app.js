@@ -126,7 +126,7 @@ function updateGlucoseCalculator() {
   result.innerHTML = `<strong>${label}: +${difference} mg/dL</strong><span>Inicial ${start} mg/dL, final ${end} mg/dL.</span>`;
 }
 
-function bindEvents() {
+function bindEventsLegacy1() {
   Object.entries(elements.forms).forEach(([mealType, form]) => {
     form.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -197,7 +197,7 @@ function bindEvents() {
   });
 }
 
-function saveMealRecord(mealType) {
+function saveMealRecordLegacy1(mealType) {
   const form = elements.forms[mealType];
   const now = new Date();
   const editingRecordId = form.dataset.editingRecordId || "";
@@ -349,7 +349,7 @@ function render() {
   renderHistory();
 }
 
-function renderForms() {
+function renderFormsLegacy1() {
   const todayKey = getLocalDateKey(new Date());
 
   ["lunch", "dinner"].forEach((mealType) => {
@@ -999,7 +999,7 @@ function getFilteredRecords() {
   });
 }
 
-function populateFormForEdit(record) {
+function populateFormForEditLegacy1(record) {
   const form = elements.forms[record.mealType];
   form.scrollIntoView({ behavior: "smooth", block: "start" });
   form.dataset.editingRecordId = record.id;
@@ -1012,7 +1012,7 @@ function populateFormForEdit(record) {
   elements.formMeta[record.mealType].textContent = `Editando registro del ${formatDate(record.recordDate)}. Al guardar, se actualizará ese día.`;
 }
 
-function populateToleranceForm(record) {
+function populateToleranceFormLegacy1(record) {
   const form = elements.toleranceForms[record.mealType];
 
   if (record.status === "missing") {
@@ -1368,9 +1368,9 @@ function computeWeeklyComparison(metrics) {
     currentGlucoseDisplay: formatGlucose(currentGlucose),
     previousGlucoseDisplay: formatGlucose(previousGlucose),
     timeInRangeDirection: getDeltaDirection(currentTimeInRange - previousTimeInRange, true),
-    glucoseDirection: getDeltaDirection(previousGlucose - currentGlucose, true),
+    glucoseDirection: getDeltaDirection(currentGlucose - previousGlucose, false),
     timeInRangeDeltaLabel: formatDeltaLabel(currentTimeInRange - previousTimeInRange, "TIR", "pts"),
-    glucoseDeltaLabel: formatDeltaLabel(previousGlucose - currentGlucose, "Glucosa", "mg/dL", true),
+    glucoseDeltaLabel: formatDeltaLabel(currentGlucose - previousGlucose, "Glucosa", "mg/dL", true),
     exportable: {
       hasComparison: true,
       currentTimeInRange,
@@ -1710,7 +1710,7 @@ function formatDeltaLabel(delta, label, unit, invertGood = false) {
   const sign = delta > 0 ? "+" : "-";
   const formatted = `${sign}${Math.abs(roundMetric(delta))} ${unit}`;
   if (invertGood) {
-    return delta > 0 ? `${formatted} mejor` : `${formatted} peor`;
+    return delta > 0 ? `${formatted} peor` : `${formatted} mejor`;
   }
 
   return delta > 0 ? `${formatted} mejor` : `${formatted} peor`;
@@ -2107,7 +2107,7 @@ function getToleranceMeta(record, isEditing) {
   return `Última tolerancia registrada: ${capitalize(record.tolerance)} el ${formatDateTime(record.toleranceUpdatedAt || record.updatedAt)}.`;
 }
 
-function bindEvents() {
+function bindEventsLegacy2() {
   Object.entries(elements.forms).forEach(([mealType, form]) => {
     form.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -2166,7 +2166,7 @@ function bindEvents() {
   });
 }
 
-function saveMealRecord(mealType) {
+function saveMealRecordLegacy2(mealType) {
   const form = elements.forms[mealType];
   const now = new Date();
   const editingRecordId = form.dataset.editingRecordId || "";
@@ -2212,7 +2212,7 @@ function saveMealRecord(mealType) {
   render();
 }
 
-function renderForms() {
+function renderFormsLegacy2() {
   const todayKey = getLocalDateKey(new Date());
 
   ["lunch", "dinner"].forEach((mealType) => {
@@ -2248,7 +2248,7 @@ function renderForms() {
   });
 }
 
-function populateFormForEdit(record) {
+function populateFormForEditLegacy2(record) {
   const form = elements.forms[record.mealType];
   form.scrollIntoView({ behavior: "smooth", block: "start" });
   form.dataset.editingRecordId = record.id;
@@ -2510,7 +2510,7 @@ function renderHistoryMetricPill(label, tone) {
   return `<span class="history-metric-pill" style="background:${tone.background};color:${tone.color};">${label}</span>`;
 }
 
-function openRecordModal({ record = null, dateKey = "", mealType = "lunch", section = "meal" }) {
+function openRecordModalLegacy1({ record = null, dateKey = "", mealType = "lunch", section = "meal" }) {
   const modal = getModalUI();
   const targetDate = record?.recordDate || dateKey || getLocalDateKey(new Date());
   const targetMealType = record?.mealType || mealType;
@@ -2522,14 +2522,14 @@ function openRecordModal({ record = null, dateKey = "", mealType = "lunch", sect
   }
 }
 
-function closeRecordModal() {
+function closeRecordModalLegacy1() {
   const modal = getModalUI();
   modal.shell.hidden = true;
   modal.notice.textContent = "";
   modal.notice.classList.remove("is-visible");
 }
 
-function hydrateRecordModal(dateKey, mealType) {
+function hydrateRecordModalLegacy1(dateKey, mealType) {
   const modal = getModalUI();
   const mealForm = modal.mealForm;
   const toleranceForm = modal.toleranceForm;
@@ -2560,7 +2560,7 @@ function hydrateRecordModal(dateKey, mealType) {
   refreshModalMeta();
 }
 
-function refreshModalMeta() {
+function refreshModalMetaLegacy1() {
   const modal = getModalUI();
   const dateKey = modal.mealForm.elements.recordDate.value;
   const mealType = modal.mealForm.elements.mealType.value;
@@ -2594,7 +2594,7 @@ function refreshModalMeta() {
   modal.toleranceMeta.textContent = `Tolerancia actual: ${capitalize(record.tolerance)}. Última actualización ${formatDateTime(record.toleranceUpdatedAt || record.updatedAt)}.`;
 }
 
-function saveModalMeal() {
+function saveModalMealLegacy1() {
   const modal = getModalUI();
   const now = new Date();
   const recordDate = modal.mealForm.elements.recordDate.value || getLocalDateKey(now);
@@ -2633,7 +2633,7 @@ function saveModalMeal() {
   render();
 }
 
-function saveModalTolerance() {
+function saveModalToleranceLegacy1() {
   const modal = getModalUI();
   const recordDate = modal.mealForm.elements.recordDate.value;
   const mealType = modal.mealForm.elements.mealType.value;
@@ -2729,7 +2729,7 @@ function saveDigestiveEvent() {
     return;
   }
 
-  const timestamp = new Date().toISOString();
+  const timestamp = getLocalTimestamp(new Date());
   if (editingEvent) {
     editingEvent.eventType = eventType;
     editingEvent.recordedAt = timestamp;
@@ -2907,12 +2907,16 @@ function formatStressEvent(value) {
   return "Estres";
 }
 
+function compareStoredTimestamps(left, right) {
+  return new Date(right).getTime() - new Date(left).getTime();
+}
+
 function sortDigestiveEvents(events) {
-  return [...events].sort((left, right) => right.recordedAt.localeCompare(left.recordedAt));
+  return [...events].sort((left, right) => compareStoredTimestamps(left.recordedAt, right.recordedAt));
 }
 
 function sortStressEvents(events) {
-  return [...events].sort((left, right) => right.recordedAt.localeCompare(left.recordedAt));
+  return [...events].sort((left, right) => compareStoredTimestamps(left.recordedAt, right.recordedAt));
 }
 
 function formatPercentage(value) {
@@ -3060,7 +3064,7 @@ function getModalRecordForSelection(dateKey, mealType) {
   return findRecordForDate(dateKey, mealType);
 }
 
-function saveMealRecord(mealType) {
+function saveMealRecordLegacy3(mealType) {
   const form = elements.forms[mealType];
   const now = new Date();
   const editingRecordId = form.dataset.editingRecordId || "";
@@ -3174,7 +3178,7 @@ function closeRecordModal() {
   modal.notice.classList.remove("is-visible");
 }
 
-function hydrateRecordModal(dateKey, mealType) {
+function hydrateRecordModalLegacy2(dateKey, mealType) {
   const modal = getModalUI();
   const mealForm = modal.mealForm;
   const toleranceForm = modal.toleranceForm;
@@ -3205,7 +3209,7 @@ function hydrateRecordModal(dateKey, mealType) {
   refreshModalMeta();
 }
 
-function refreshModalMeta() {
+function refreshModalMetaLegacy2() {
   const modal = getModalUI();
   const dateKey = modal.mealForm.elements.recordDate.value;
   const mealType = modal.mealForm.elements.mealType.value;
@@ -3243,7 +3247,7 @@ function refreshModalMeta() {
   modal.toleranceMeta.textContent = `Tolerancia actual: ${capitalize(record.tolerance)}. Ãšltima actualizaciÃ³n ${formatDateTime(record.toleranceUpdatedAt || record.updatedAt)}.`;
 }
 
-function saveModalMeal() {
+function saveModalMealLegacy2() {
   const modal = getModalUI();
   const now = new Date();
   const recordDate = modal.mealForm.elements.recordDate.value || getLocalDateKey(now);
@@ -3294,7 +3298,7 @@ function saveModalMeal() {
   render();
 }
 
-function saveModalTolerance() {
+function saveModalToleranceLegacy2() {
   const modal = getModalUI();
   const recordDate = modal.mealForm.elements.recordDate.value;
   const mealType = modal.mealForm.elements.mealType.value;
