@@ -1687,19 +1687,29 @@ function getLatestConsecutiveMetricWindow(metrics, requiredLength) {
     return [];
   }
 
-  const window = [metrics[0]];
+  for (let startIndex = 0; startIndex <= metrics.length - requiredLength; startIndex += 1) {
+    const window = [metrics[startIndex]];
 
-  for (let index = 1; index < metrics.length && window.length < requiredLength; index += 1) {
-    const previousDate = parseDateKey(window[window.length - 1].metricDate);
-    const expectedDate = getLocalDateKey(shiftDate(previousDate, -1));
-    if (metrics[index].metricDate !== expectedDate) {
-      break;
+    for (
+      let index = startIndex + 1;
+      index < metrics.length && window.length < requiredLength;
+      index += 1
+    ) {
+      const previousDate = parseDateKey(window[window.length - 1].metricDate);
+      const expectedDate = getLocalDateKey(shiftDate(previousDate, -1));
+      if (metrics[index].metricDate !== expectedDate) {
+        break;
+      }
+
+      window.push(metrics[index]);
     }
 
-    window.push(metrics[index]);
+    if (window.length === requiredLength) {
+      return window;
+    }
   }
 
-  return window.length === requiredLength ? window : [];
+  return [];
 }
 
 function formatDeltaLabel(delta, label, unit, invertGood = false) {
