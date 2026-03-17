@@ -517,7 +517,7 @@ function renderInsights(insights, dailyMetrics) {
         <div class="insight-kpi-row">
           <div class="insight-kpi">
             <strong>${insights.streaks.greenDays}</strong>
-            <span>Dias seguidos con al menos un verde</span>
+            <span>Dias seguidos con tolerancia verde</span>
           </div>
           <div class="insight-kpi">
             <strong>${insights.streaks.timeInRangeDays}</strong>
