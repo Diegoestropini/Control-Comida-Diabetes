@@ -39,6 +39,7 @@ const elements = {
   timelineChart: document.getElementById("timeline-chart"),
   timelineMoreShell: document.getElementById("timeline-more-shell"),
   mealBreakdown: document.getElementById("meal-breakdown"),
+  repeatedFoodRanking: document.getElementById("repeated-food-ranking"),
   missingSummary: document.getElementById("missing-summary"),
   historyBody: document.getElementById("history-body"),
   historyMoreShell: document.getElementById("history-more-shell"),
@@ -451,6 +452,7 @@ function renderStats() {
   renderInsights(insights, state.dailyMetrics);
   renderTimeline(stats.timeline);
   renderMealBreakdown(stats.breakdownByMeal, insights.mealComparison || createEmptyMealComparison());
+  renderRepeatedFoodRanking(computeRepeatedFoodRanking(state.records));
   renderMissingSummary(stats.missingCount);
   renderDailyMetricsBoard(dailyMetricStats.sortedMetrics);
   renderDigestiveEventsBoard(sortDigestiveEvents(state.digestiveEvents));
@@ -752,6 +754,247 @@ function renderMissingSummary(missingCount) {
     <div class="mini-line"><span>Creacion automatica</span><span>Al cierre del dia</span></div>
     <div class="mini-line"><span>Edicion posterior</span><span>Permitida</span></div>
   `;
+}
+
+function renderRepeatedFoodRanking(ranking) {
+  if (!elements.repeatedFoodRanking) {
+    return;
+  }
+
+  if (!ranking.safe.length && !ranking.risky.length) {
+    elements.repeatedFoodRanking.innerHTML = `
+      <div class="empty-state">
+        Se necesitan al menos 2 coincidencias verdes o rojas para detectar comidas seguras o riesgosas.
+      </div>
+    `;
+    return;
+  }
+
+  elements.repeatedFoodRanking.innerHTML = `
+    <div class="repeated-food-columns">
+      <section class="repeated-food-column repeated-food-column-safe">
+        <div class="repeated-food-column-header">
+          <strong>Comidas seguras</strong>
+          <span>Verdes consecutivos</span>
+        </div>
+        ${renderRepeatedFoodList(ranking.safe, "safe")}
+      </section>
+      <section class="repeated-food-column repeated-food-column-risk">
+        <div class="repeated-food-column-header">
+          <strong>Comidas riesgosas</strong>
+          <span>Rojos y amarillos frecuentes</span>
+        </div>
+        ${renderRepeatedFoodList(ranking.risky, "risk")}
+      </section>
+    </div>
+    <p class="repeated-food-footnote">
+      Se mezcla coincidencia de comida completa y palabras clave repetidas usando solo registros con tolerancia verde, amarilla o roja.
+    </p>
+  `;
+}
+
+function renderRepeatedFoodList(items, tone) {
+  if (!items.length) {
+    return '<div class="empty-state compact">Todavia no hay suficientes repeticiones.</div>';
+  }
+
+  return items.map((item, index) => `
+    <article class="repeated-food-item repeated-food-item-${tone}">
+      <div class="repeated-food-item-top">
+        <span class="repeated-food-rank">#${index + 1}</span>
+        <span class="repeated-food-kind">${item.kindLabel}</span>
+      </div>
+      <strong class="repeated-food-label">${escapeHtml(item.label)}</strong>
+      <div class="repeated-food-stats">
+        <span>Verdes ${item.greenCount}</span>
+        <span>Amarillos ${item.yellowCount} · Rojos ${item.redCount}</span>
+      </div>
+      <div class="repeated-food-meta">
+        ${tone === "safe"
+          ? `<span>Racha verde: ${item.maxGreenStreak}</span>`
+          : `<span>Impacto de riesgo: ${item.riskCount}</span>`}
+        <span>${item.mealTypesLabel}</span>
+      </div>
+    </article>
+  `).join("");
+}
+
+function computeRepeatedFoodRanking(records) {
+  const chronologicallySorted = [...records]
+    .filter((record) => (
+      record.status === "recorded"
+      && ["verde", "amarillo", "rojo"].includes(record.tolerance)
+      && typeof record.mealText === "string"
+      && record.mealText.trim()
+    ))
+    .sort((left, right) => {
+      const byDate = left.recordDate.localeCompare(right.recordDate);
+      if (byDate !== 0) {
+        return byDate;
+      }
+
+      const bySchedule = left.scheduledTime.localeCompare(right.scheduledTime);
+      if (bySchedule !== 0) {
+        return bySchedule;
+      }
+
+      return left.createdAt.localeCompare(right.createdAt);
+    });
+
+  const terms = new Map();
+
+  chronologicallySorted.forEach((record) => {
+    collectRecordTerms(record).forEach((term) => {
+      const current = terms.get(term.key) || createRepeatedFoodTerm(term, record);
+      current.appearances += 1;
+      current.mealTypes.add(record.mealType);
+
+      if (record.tolerance === "verde") {
+        current.greenCount += 1;
+        current.currentGreenStreak += 1;
+        current.maxGreenStreak = Math.max(current.maxGreenStreak, current.currentGreenStreak);
+      } else if (record.tolerance === "amarillo") {
+        current.yellowCount += 1;
+        current.currentGreenStreak = 0;
+      } else {
+        current.redCount += 1;
+        current.currentGreenStreak = 0;
+      }
+
+      terms.set(term.key, current);
+    });
+  });
+
+  const rankedTerms = Array.from(terms.values()).map((term) => ({
+    ...term,
+    riskCount: term.yellowCount + term.redCount,
+    mealTypesLabel: getRepeatedFoodMealTypesLabel(term.mealTypes),
+    kindLabel: term.kind === "meal" ? "Comida" : "Palabra clave",
+  }));
+
+  return {
+    safe: rankedTerms
+      .filter((term) => term.greenCount >= 2 && term.maxGreenStreak >= 2 && term.greenCount > term.riskCount)
+      .sort((left, right) => (
+        getSafeRankingScore(right) - getSafeRankingScore(left)
+        || right.maxGreenStreak - left.maxGreenStreak
+        || right.greenCount - left.greenCount
+        || left.label.localeCompare(right.label)
+      ))
+      .slice(0, 6),
+    risky: rankedTerms
+      .filter((term) => term.riskCount >= 2 && term.riskCount > term.greenCount)
+      .sort((left, right) => (
+        getRiskRankingScore(right) - getRiskRankingScore(left)
+        || right.riskCount - left.riskCount
+        || left.label.localeCompare(right.label)
+      ))
+      .slice(0, 6),
+  };
+}
+
+function collectRecordTerms(record) {
+  const normalizedMeal = normalizeMealSearchText(record.mealText);
+  if (!normalizedMeal) {
+    return [];
+  }
+
+  const terms = [
+    {
+      key: `meal:${normalizedMeal}`,
+      label: formatRankingLabel(record.mealText),
+      kind: "meal",
+    },
+  ];
+
+  extractMealKeywords(record.mealText).forEach((keyword) => {
+    terms.push({
+      key: `keyword:${keyword}`,
+      label: formatRankingLabel(keyword),
+      kind: "keyword",
+    });
+  });
+
+  return terms;
+}
+
+function createRepeatedFoodTerm(term, record) {
+  return {
+    key: term.key,
+    label: term.label,
+    kind: term.kind,
+    appearances: 0,
+    greenCount: 0,
+    yellowCount: 0,
+    redCount: 0,
+    currentGreenStreak: 0,
+    maxGreenStreak: 0,
+    mealTypes: new Set(record.mealType ? [record.mealType] : []),
+  };
+}
+
+function getSafeRankingScore(item) {
+  return (item.maxGreenStreak * 4) + (item.greenCount * 2) - item.riskCount;
+}
+
+function getRiskRankingScore(item) {
+  return (item.redCount * 4) + (item.yellowCount * 2) - (item.greenCount * 2);
+}
+
+function getRepeatedFoodMealTypesLabel(mealTypes) {
+  const sortedMealTypes = Array.from(mealTypes).sort();
+  if (sortedMealTypes.length === 2) {
+    return "Almuerzo y cena";
+  }
+
+  if (sortedMealTypes[0] === "dinner") {
+    return "Cena";
+  }
+
+  return "Almuerzo";
+}
+
+function normalizeMealSearchText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s,]/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/\s*,\s*/g, ", ")
+    .trim();
+}
+
+function extractMealKeywords(mealText) {
+  const stopWords = new Set([
+    "a", "al", "algo", "con", "de", "del", "despues", "dos", "el", "en", "la", "las", "lo", "los",
+    "mas", "media", "mi", "mis", "o", "otra", "otro", "para", "por", "sin", "su", "sus", "un", "una",
+    "unas", "uno", "unos", "y",
+  ]);
+
+  return Array.from(new Set(
+    normalizeMealSearchText(mealText)
+      .split(/[\s,]+/)
+      .filter((token) => token.length >= 3 && !stopWords.has(token) && !/^\d+$/.test(token))
+  )).slice(0, 8);
+}
+
+function formatRankingLabel(value) {
+  const compact = String(value || "").replace(/\s+/g, " ").trim();
+  if (!compact) {
+    return "Sin texto";
+  }
+
+  return compact.length > 56 ? `${compact.slice(0, 53)}...` : compact;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function renderDailyMetricsBoard(metrics) {
