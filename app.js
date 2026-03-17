@@ -721,8 +721,8 @@ function renderMealBreakdown(breakdown, mealComparison) {
 function renderMissingSummary(missingCount) {
   elements.missingSummary.innerHTML = `
     <div class="mini-line"><strong>Registros faltantes</strong><span>${missingCount}</span></div>
-    <div class="mini-line"><span>Creación automática</span><span>Al cierre del día</span></div>
-    <div class="mini-line"><span>Edición posterior</span><span>Permitida</span></div>
+    <div class="mini-line"><span>Creacion automatica</span><span>Al cierre del dia</span></div>
+    <div class="mini-line"><span>Edicion posterior</span><span>Permitida</span></div>
   `;
 }
 
@@ -1174,7 +1174,7 @@ function exportRecords() {
   link.click();
   URL.revokeObjectURL(url);
 
-  setNotice("Exportación JSON lista.");
+  setNotice("Exportacion JSON lista.");
 }
 
 function sortRecords(records) {
@@ -2065,7 +2065,7 @@ function shiftDate(date, days) {
 }
 
 function getMealsEligibleForClosure(dateKey, referenceDate, options = {}) {
-  if (options.forceDateKey && options.forceDateKey !== getLocalDateKey(referenceDate)) {
+  if (options.forceDateKey === dateKey) {
     return Object.keys(DEFAULT_TIMES);
   }
 
@@ -2103,18 +2103,18 @@ function getToleranceMeta(record, isEditing) {
   }
 
   if (!record) {
-    return "Primero guardá la comida. La tolerancia puede quedar pendiente.";
+    return "Primero guarda la comida. La tolerancia puede quedar pendiente.";
   }
 
   if (record.status === "missing") {
-    return "Ese registro está marcado como “no registró nada”.";
+    return "Ese registro esta marcado como \"no registro nada\".";
   }
 
   if (!record.tolerance) {
-    return "Tolerancia pendiente. Podés cargarla más tarde.";
+    return "Tolerancia pendiente. Podes cargarla mas tarde.";
   }
 
-  return `Última tolerancia registrada: ${capitalize(record.tolerance)} el ${formatDateTime(record.toleranceUpdatedAt || record.updatedAt)}.`;
+  return `Ultima tolerancia registrada: ${capitalize(record.tolerance)} el ${formatDateTime(record.toleranceUpdatedAt || record.updatedAt)}.`;
 }
 
 function bindEventsLegacy2() {
@@ -2257,7 +2257,6 @@ function renderFormsLegacy2() {
     elements.toleranceMeta[mealType].textContent = getToleranceMeta(record, Boolean(editingRecord));
   });
 }
-
 function populateFormForEditLegacy2(record) {
   const form = elements.forms[record.mealType];
   form.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -2268,9 +2267,10 @@ function populateFormForEditLegacy2(record) {
   form.elements.mealText.disabled = false;
   form.elements.mealText.value = record.status === "missing" ? "" : record.mealText;
 
-  setNotice(`Editando ${MEAL_LABELS[record.mealType].toLowerCase()} del ${formatDate(record.recordDate)}. Guardá para aplicar cambios.`);
-  elements.formMeta[record.mealType].textContent = `Editando registro del ${formatDate(record.recordDate)}. Al guardar, se actualizará ese día.`;
+  setNotice(`Editando ${MEAL_LABELS[record.mealType].toLowerCase()} del ${formatDate(record.recordDate)}. Guarda para aplicar cambios.`);
+  elements.formMeta[record.mealType].textContent = `Editando registro del ${formatDate(record.recordDate)}. Al guardar, se actualizara ese dia.`;
 }
+
 
 function clearEditState(form) {
   delete form.dataset.editingRecordId;
@@ -2347,7 +2347,7 @@ function bindEvents() {
     button.addEventListener("click", () => {
       clearEditState(elements.forms[mealType]);
       render();
-      setNotice(`Edición de ${MEAL_LABELS[mealType].toLowerCase()} cancelada.`);
+      setNotice(`Edicion de ${MEAL_LABELS[mealType].toLowerCase()} cancelada.`);
     });
   });
 
@@ -2355,7 +2355,7 @@ function bindEvents() {
     button.addEventListener("click", () => {
       clearEditState(elements.toleranceForms[mealType]);
       render();
-      setNotice(`Edición de tolerancia de ${MEAL_LABELS[mealType].toLowerCase()} cancelada.`);
+      setNotice(`Edicion de tolerancia de ${MEAL_LABELS[mealType].toLowerCase()} cancelada.`);
     });
   });
 
@@ -2373,7 +2373,7 @@ function bindEvents() {
   elements.dailyMetricsCancel.addEventListener("click", () => {
     clearDailyMetricEditState();
     render();
-    setNotice("Edición de indicadores diarios cancelada.");
+    setNotice("Edicion de indicadores diarios cancelada.");
   });
 
   const modal = getModalUI();
@@ -2414,15 +2414,16 @@ function bindEvents() {
 
   elements.exportButton.addEventListener("click", exportRecords);
   elements.forceCloseButton.addEventListener("click", () => {
-    runDailyClosure({ forceDateKey: getLocalDateKey(new Date()) });
-    setNotice("Se ejecutó el cierre diario manualmente para hoy.");
+    const closureResult = runDailyClosure({ forceDateKey: getLocalDateKey(new Date()) });
+    if (!closureResult.touchedDates.length) {
+      setNotice("Se ejecuto el cierre manual para hoy. No habia faltantes para crear.");
+    } else if (closureResult.createdCount > 0) {
+      setNotice(`Se ejecuto el cierre manual para hoy y se marcaron ${closureResult.createdCount} faltante(s).`);
+    } else {
+      setNotice("Se ejecuto el cierre manual para hoy. No habia faltantes pendientes.");
+    }
     render();
   });
-
-  [elements.glucoseStart, elements.glucoseEnd].forEach((input) => {
-    input.addEventListener("input", updateGlucoseCalculator);
-  });
-
   [elements.filterFrom, elements.filterTo, elements.filterTolerance].forEach((control) => {
     control.addEventListener("input", () => {
       state.showAllHistory = false;
@@ -2430,7 +2431,6 @@ function bindEvents() {
     });
   });
 }
-
 function renderHistory() {
   const records = sortRecords(getFilteredRecords());
   elements.historyBody.innerHTML = "";
@@ -2696,7 +2696,7 @@ function saveDailyMetric() {
   }
 
   if (!Number.isFinite(averageGlucose) || averageGlucose < 0) {
-    setNotice("La glucosa media debe ser un valor válido en mg/dL.");
+    setNotice("La glucosa media debe ser un valor valido en mg/dL.");
     return;
   }
 
@@ -3538,3 +3538,4 @@ function saveModalTolerance() {
   hydrateRecordModal(recordDate, mealType);
   render();
 }
+

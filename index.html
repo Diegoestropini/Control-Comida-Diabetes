@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Control Alimentario Diabético</title>
+  <title>Control Alimentario Diabetico</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -16,13 +16,13 @@
         <p class="eyebrow">Registro diario</p>
         <h1>Almuerzos, cenas y tolerancia alimentaria</h1>
         <p class="hero-text">
-          Registrá la comida completa, la tolerancia observada y dejá los datos listos para análisis futuros.
+          Registra la comida completa, la tolerancia observada y deja los datos listos para analisis futuros.
         </p>
       </div>
       <div class="hero-actions">
         <button id="quick-entry-button" class="action-button primary" type="button">Registro rapido</button>
         <button id="export-button" class="action-button secondary" type="button">Exportar JSON</button>
-        <button id="force-close-button" class="action-button ghost" type="button">Cerrar día ahora</button>
+        <button id="force-close-button" class="action-button ghost" type="button">Cerrar dia ahora</button>
         <section class="glucose-calculator" aria-labelledby="glucose-calculator-title">
           <div class="glucose-calculator-header">
             <div>
@@ -92,11 +92,11 @@
 
               <label class="missing-toggle">
                 <input name="markMissing" type="checkbox">
-                <span>Marcar como “no registró nada”</span>
+                <span>Marcar como "no registro nada"</span>
               </label>
 
               <div class="form-meta">
-                <p class="hint" data-form-meta="lunch">Se guardará con la fecha y hora local exacta del registro.</p>
+                <p class="hint" data-form-meta="lunch">Se guardara con la fecha y hora local exacta del registro.</p>
                 <div class="form-actions">
                   <button class="action-button ghost" data-cancel-edit="lunch" type="button">Cancelar</button>
                   <button class="action-button primary" type="submit">Guardar almuerzo</button>
@@ -106,8 +106,8 @@
 
             <form class="tolerance-form" data-tolerance-form="lunch">
               <div class="subsection-header">
-                <h4>Registrar tolerancia después</h4>
-                <p class="hint" data-tolerance-meta="lunch">Primero guardá la comida. La tolerancia puede quedar pendiente.</p>
+                <h4>Registrar tolerancia despues</h4>
+                <p class="hint" data-tolerance-meta="lunch">Primero guarda la comida. La tolerancia puede quedar pendiente.</p>
               </div>
 
               <fieldset class="tolerance-fieldset">
@@ -165,11 +165,11 @@
 
               <label class="missing-toggle">
                 <input name="markMissing" type="checkbox">
-                <span>Marcar como “no registró nada”</span>
+                <span>Marcar como "no registro nada"</span>
               </label>
 
               <div class="form-meta">
-                <p class="hint" data-form-meta="dinner">El registro se puede editar más adelante sin generar duplicados.</p>
+                <p class="hint" data-form-meta="dinner">El registro se puede editar mas adelante sin generar duplicados.</p>
                 <div class="form-actions">
                   <button class="action-button ghost" data-cancel-edit="dinner" type="button">Cancelar</button>
                   <button class="action-button primary" type="submit">Guardar cena</button>
@@ -179,8 +179,8 @@
 
             <form class="tolerance-form" data-tolerance-form="dinner">
               <div class="subsection-header">
-                <h4>Registrar tolerancia después</h4>
-                <p class="hint" data-tolerance-meta="dinner">Primero guardá la comida. La tolerancia puede quedar pendiente.</p>
+                <h4>Registrar tolerancia despues</h4>
+                <p class="hint" data-tolerance-meta="dinner">Primero guarda la comida. La tolerancia puede quedar pendiente.</p>
               </div>
 
               <fieldset class="tolerance-fieldset">
@@ -244,7 +244,7 @@
                 <span>Dato extra opcional</span>
                 <select name="digestiveEvent">
                   <option value="">Nada para registrar</option>
-                  <option value="constipation">Estrenimiento</option>
+                  <option value="constipation">Constipacion</option>
                   <option value="diarrhea">Diarrea</option>
                 </select>
               </label>
@@ -256,15 +256,15 @@
 
             <div class="optional-note-block">
               <label class="optional-inline-field">
-                <span>Estrés</span>
+                <span>Estres</span>
                 <select name="stressEvent">
                   <option value="">Nada para registrar</option>
-                  <option value="yes">Hubo estrés</option>
+                  <option value="yes">Hubo estres</option>
                 </select>
               </label>
               <p class="hint" id="stress-event-meta">Se guarda aparte y usa la fecha y hora local exacta del momento del registro.</p>
               <div class="form-actions">
-                <button id="stress-event-save" class="action-button ghost" type="button">Guardar estrés</button>
+                <button id="stress-event-save" class="action-button ghost" type="button">Guardar estres</button>
               </div>
             </div>
 
@@ -283,7 +283,7 @@
         <div class="panel-header">
           <div>
             <p class="panel-kicker">Resumen</p>
-            <h2>Estadísticas</h2>
+            <h2>Estadisticas</h2>
           </div>
         </div>
 
@@ -295,15 +295,15 @@
 
         <div class="chart-panel">
           <div class="chart-header">
-            <h3>Tendencia cronológica</h3>
-            <p>Últimos días con registros cargados.</p>
+            <h3>Tendencia cronologica</h3>
+            <p>Ultimos dias con registros cargados.</p>
           </div>
           <div id="timeline-chart" class="timeline-chart"></div>
         </div>
 
         <div class="breakdown-grid">
           <div class="mini-panel neon-summary-mini">
-            <h3>Indicadores por día</h3>
+            <h3>Indicadores por dia</h3>
             <div id="daily-metrics-board" class="daily-metrics-board"></div>
           </div>
           <div class="mini-panel neon-summary-mini">
@@ -311,7 +311,7 @@
             <div id="digestive-events-board" class="daily-metrics-board"></div>
           </div>
           <div class="mini-panel neon-summary-mini">
-            <h3>Estrés</h3>
+            <h3>Estres</h3>
             <div id="stress-events-board" class="daily-metrics-board"></div>
           </div>
           <div class="mini-panel neon-summary-mini meal-breakdown-panel">
@@ -319,7 +319,7 @@
             <div id="meal-breakdown" class="mini-panel-body"></div>
           </div>
           <div class="mini-panel neon-summary-mini">
-            <h3>Faltantes automáticos</h3>
+            <h3>Faltantes automaticos</h3>
             <div id="missing-summary" class="mini-panel-body"></div>
           </div>
         </div>
@@ -329,7 +329,7 @@
         <div class="panel-header history-header">
           <div>
             <p class="panel-kicker">Seguimiento</p>
-            <h2>Historial cronológico</h2>
+            <h2>Historial cronologico</h2>
           </div>
           <div class="history-filters">
             <label>
@@ -348,7 +348,7 @@
                 <option value="amarillo">Amarillo</option>
                 <option value="rojo">Rojo</option>
                 <option value="pending">Pendiente</option>
-                <option value="missing">No registró nada</option>
+                <option value="missing">No registro nada</option>
               </select>
             </label>
           </div>
