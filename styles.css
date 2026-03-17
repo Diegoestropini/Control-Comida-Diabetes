@@ -681,6 +681,12 @@ textarea {
   min-height: 160px;
 }
 
+.timeline-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 18px 18px;
+}
+
 .timeline-row {
   display: grid;
   grid-template-columns: 92px 1fr auto;

@@ -22,6 +22,7 @@ const state = {
   showAllDailyMetrics: false,
   showAllDigestiveEvents: false,
   showAllStressEvents: false,
+  showAllTimeline: false,
   showAllHistory: false,
   insightsMonth: "all",
 };
@@ -36,6 +37,7 @@ const elements = {
   digestiveEventsBoard: document.getElementById("digestive-events-board"),
   stressEventsBoard: document.getElementById("stress-events-board"),
   timelineChart: document.getElementById("timeline-chart"),
+  timelineMoreShell: document.getElementById("timeline-more-shell"),
   mealBreakdown: document.getElementById("meal-breakdown"),
   missingSummary: document.getElementById("missing-summary"),
   historyBody: document.getElementById("history-body"),
@@ -617,10 +619,16 @@ function renderControlDayHighlight(day, emptyMessage) {
 function renderTimeline(timeline) {
   if (!timeline.length) {
     elements.timelineChart.innerHTML = '<div class="empty-state">Todavía no hay registros para mostrar tendencia.</div>';
+    if (elements.timelineMoreShell) {
+      elements.timelineMoreShell.innerHTML = "";
+    }
     return;
   }
 
-  elements.timelineChart.innerHTML = timeline.map((item) => {
+  const orderedTimeline = [...timeline].reverse();
+  const visibleTimeline = state.showAllTimeline ? orderedTimeline : orderedTimeline.slice(0, 3);
+
+  elements.timelineChart.innerHTML = visibleTimeline.map((item) => {
     const total = item.total || 1;
     const segments = [
       { name: "green", value: item.verde },
@@ -642,6 +650,26 @@ function renderTimeline(timeline) {
       </div>
     `;
   }).join("");
+
+  if (!elements.timelineMoreShell) {
+    return;
+  }
+
+  if (orderedTimeline.length <= 3) {
+    elements.timelineMoreShell.innerHTML = "";
+    return;
+  }
+
+  elements.timelineMoreShell.innerHTML = `
+    <button class="table-action" data-action="toggle-timeline" type="button">
+      ${state.showAllTimeline ? "Mostrar menos" : "Ver mas"}
+    </button>
+  `;
+
+  elements.timelineMoreShell.querySelector('[data-action="toggle-timeline"]').addEventListener("click", () => {
+    state.showAllTimeline = !state.showAllTimeline;
+    renderStats();
+  });
 }
 
 function renderMealBreakdown(breakdown, mealComparison) {
