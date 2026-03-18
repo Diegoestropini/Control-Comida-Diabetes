@@ -2291,6 +2291,26 @@ function formatShortDate(dateKey) {
   }).format(new Date(year, month - 1, day));
 }
 
+function getDateAccentColor(dateKey) {
+  const palette = [
+    "#ff8a65",
+    "#4fc3f7",
+    "#ffd54f",
+    "#81c784",
+    "#ba68c8",
+    "#ffb74d",
+    "#64b5f6",
+    "#f06292",
+    "#4db6ac",
+    "#9575cd",
+  ];
+  const hash = Array.from(dateKey).reduce((accumulator, character) => (
+    (accumulator * 31 + character.charCodeAt(0)) % 2147483647
+  ), 7);
+
+  return palette[hash % palette.length];
+}
+
 function formatDateTime(isoString) {
   return new Intl.DateTimeFormat("es-UY", {
     dateStyle: "short",
@@ -2713,7 +2733,11 @@ function renderHistory() {
   visibleRecords.forEach((record) => {
     const dailyMetric = findDailyMetricByDate(record.recordDate);
     const row = elements.historyTemplate.content.firstElementChild.cloneNode(true);
-    row.querySelector('[data-cell="date"]').textContent = formatDate(record.recordDate);
+    row.querySelector('[data-cell="date"]').innerHTML = `
+      <span class="history-date-label" style="color: ${getDateAccentColor(record.recordDate)};">
+        ${formatDate(record.recordDate)}
+      </span>
+    `;
     row.querySelector('[data-cell="mealType"]').textContent = MEAL_LABELS[record.mealType];
     row.querySelector('[data-cell="scheduledTime"]').textContent = record.scheduledTime;
     row.querySelector('[data-cell="createdAt"]').textContent = formatDateTime(record.createdAt);
