@@ -134,7 +134,7 @@ function saveTolerance(mealType) {
   const now = new Date();
   const editingRecordId = form.dataset.editingRecordId || "";
   const editingRecord = editingRecordId ? findRecordById(editingRecordId) : null;
-  const recordDate = editingRecord?.recordDate || getActiveMealRecordDate(mealType) || getLocalDateKey(now);
+  const recordDate = editingRecord?.recordDate || form.dataset.recordDate || getActiveMealRecordDate(mealType) || getLocalDateKey(now);
   const record = editingRecord || findRecordForDate(recordDate, mealType);
 
   if (!record) {
@@ -2143,7 +2143,9 @@ function shiftDate(date, days) {
 
 function getMealsEligibleForClosure(dateKey, referenceDate, options = {}) {
   if (options.forceDateKey === dateKey) {
-    return Object.keys(DEFAULT_TIMES);
+    if (dateKey !== getLocalDateKey(referenceDate)) {
+      return Object.keys(DEFAULT_TIMES);
+    }
   }
 
   return Object.keys(DEFAULT_TIMES).filter((mealType) => (
@@ -2180,18 +2182,18 @@ function getToleranceMeta(record, isEditing) {
   }
 
   if (!record) {
-    return "Primero guarda la comida. La tolerancia puede quedar pendiente.";
+    return "Primero guarda la comida para la fecha seleccionada. La tolerancia puede quedar pendiente.";
   }
 
   if (record.status === "missing") {
-    return "Ese registro esta marcado como \"no registro nada\".";
+    return `Ese registro del ${formatDate(record.recordDate)} esta marcado como "no registro nada".`;
   }
 
   if (!record.tolerance) {
-    return "Tolerancia pendiente. Podes cargarla mas tarde.";
+    return `Tolerancia pendiente para ${formatDate(record.recordDate)}. Podes cargarla mas tarde.`;
   }
 
-  return `Ultima tolerancia registrada: ${capitalize(record.tolerance)} el ${formatDateTime(record.toleranceUpdatedAt || record.updatedAt)}.`;
+  return `Tolerancia de ${formatDate(record.recordDate)}: ${capitalize(record.tolerance)}. Ultima actualizacion ${formatDateTime(record.toleranceUpdatedAt || record.updatedAt)}.`;
 }
 
 function hydrateMealFormForDate(mealType, dateKey) {
@@ -2215,6 +2217,23 @@ function hydrateMealFormForDate(mealType, dateKey) {
   } else {
     elements.formMeta[mealType].textContent = "Se guardará con la fecha y hora local exacta del registro.";
   }
+}
+
+function hydrateToleranceFormForDate(mealType, dateKey) {
+  const form = elements.toleranceForms[mealType];
+  const targetDate = dateKey || getLocalDateKey(new Date());
+  const editingRecord = form.dataset.editingRecordId ? findRecordById(form.dataset.editingRecordId) : null;
+  const record = editingRecord || findRecordForDate(targetDate, mealType);
+  const selectedTolerance = record?.tolerance || "verde";
+  const radio = form.querySelector(`input[name="tolerance"][value="${selectedTolerance}"]`);
+
+  form.dataset.recordDate = targetDate;
+
+  if (radio) {
+    radio.checked = true;
+  }
+
+  elements.toleranceMeta[mealType].textContent = getToleranceMeta(record, Boolean(editingRecord));
 }
 
 function getModalUI() {
@@ -2250,6 +2269,7 @@ function bindEvents() {
     form.elements.recordDate.addEventListener("input", () => {
       if (!form.dataset.editingRecordId) {
         hydrateMealFormForDate(mealType, form.elements.recordDate.value);
+        hydrateToleranceFormForDate(mealType, form.elements.recordDate.value);
       }
     });
   });
@@ -2511,7 +2531,6 @@ function saveDigestiveEvent() {
   const timestamp = getLocalTimestamp(new Date());
   if (editingEvent) {
     editingEvent.eventType = eventType;
-    editingEvent.recordedAt = timestamp;
   } else {
     state.digestiveEvents.push({
       id: createDigestiveEventId(),
@@ -2520,13 +2539,14 @@ function saveDigestiveEvent() {
       source: "manual",
     });
   }
+  const savedTimestamp = editingEvent?.recordedAt || timestamp;
   persistDigestiveEvents();
   clearDigestiveEventEditState();
   renderStats();
   setNotice(
     editingEvent
-      ? `${formatDigestiveEvent(eventType)} actualizado para ${formatDateTime(timestamp)}.`
-      : `${formatDigestiveEvent(eventType)} registrado como dato extra para ${formatDateTime(timestamp)}.`
+      ? `${formatDigestiveEvent(eventType)} actualizado para ${formatDateTime(savedTimestamp)}.`
+      : `${formatDigestiveEvent(eventType)} registrado como dato extra para ${formatDateTime(savedTimestamp)}.`
   );
 }
 
@@ -2543,7 +2563,6 @@ function saveStressEvent() {
   const timestamp = getLocalTimestamp(new Date());
   if (editingEvent) {
     editingEvent.stressLevel = stressLevel;
-    editingEvent.recordedAt = timestamp;
   } else {
     state.stressEvents.push({
       id: createStressEventId(),
@@ -2552,13 +2571,14 @@ function saveStressEvent() {
       source: "manual",
     });
   }
+  const savedTimestamp = editingEvent?.recordedAt || timestamp;
   persistStressEvents();
   clearStressEventEditState();
   renderStats();
   setNotice(
     editingEvent
-      ? `${formatStressEvent(stressLevel)} actualizado para ${formatDateTime(timestamp)}.`
-      : `${formatStressEvent(stressLevel)} registrado para ${formatDateTime(timestamp)}.`
+      ? `${formatStressEvent(stressLevel)} actualizado para ${formatDateTime(savedTimestamp)}.`
+      : `${formatStressEvent(stressLevel)} registrado para ${formatDateTime(savedTimestamp)}.`
   );
 }
 
@@ -2871,15 +2891,7 @@ function renderForms() {
     const form = elements.toleranceForms[mealType];
     const editingRecord = form.dataset.editingRecordId ? findRecordById(form.dataset.editingRecordId) : null;
     const activeDate = getActiveMealRecordDate(mealType) || todayKey;
-    const record = editingRecord || findRecordForDate(activeDate, mealType);
-    const selectedTolerance = record?.tolerance || "verde";
-    const radio = form.querySelector(`input[name="tolerance"][value="${selectedTolerance}"]`);
-
-    if (radio) {
-      radio.checked = true;
-    }
-
-    elements.toleranceMeta[mealType].textContent = getToleranceMeta(record, Boolean(editingRecord));
+    hydrateToleranceFormForDate(mealType, editingRecord?.recordDate || activeDate);
   });
 }
 
