@@ -25,6 +25,8 @@ const state = {
   showAllTimeline: false,
   showAllHistory: false,
   insightsMonth: "all",
+  monthlyMetricsChartOpen: false,
+  monthlyMetricsChartMonth: "",
 };
 
 const elements = {
@@ -32,6 +34,7 @@ const elements = {
   notice: document.getElementById("notice"),
   statsGrid: document.getElementById("stats-grid"),
   dailyMetricsSummary: document.getElementById("daily-metrics-summary"),
+  monthlyMetricsChartShell: document.getElementById("monthly-metrics-chart-shell"),
   insightsGrid: document.getElementById("insights-grid"),
   dailyMetricsBoard: document.getElementById("daily-metrics-board"),
   digestiveEventsBoard: document.getElementById("digestive-events-board"),
@@ -288,6 +291,7 @@ function renderStats() {
     ),
   ].join("");
 
+  renderMonthlyMetricsChart(dailyMetricStats.sortedMetrics);
   renderInsights(insights, state.dailyMetrics);
   renderTimeline(stats.timeline);
   renderMealBreakdown(stats.breakdownByMeal, insights.mealComparison || createEmptyMealComparison());
@@ -2194,6 +2198,145 @@ function getToleranceMeta(record, isEditing) {
   }
 
   return `Tolerancia de ${formatDate(record.recordDate)}: ${capitalize(record.tolerance)}. Ultima actualizacion ${formatDateTime(record.toleranceUpdatedAt || record.updatedAt)}.`;
+}
+
+function renderMonthlyMetricsChart(metrics) {
+  if (!elements.monthlyMetricsChartShell) {
+    return;
+  }
+
+  const monthOptions = getAvailableMetricMonths(metrics);
+  const hasMetrics = monthOptions.length > 0;
+
+  if (!hasMetrics) {
+    state.monthlyMetricsChartOpen = false;
+    state.monthlyMetricsChartMonth = "";
+  } else if (!state.monthlyMetricsChartMonth || !monthOptions.includes(state.monthlyMetricsChartMonth)) {
+    state.monthlyMetricsChartMonth = monthOptions[0];
+  }
+
+  const toggleLabel = state.monthlyMetricsChartOpen ? "Ocultar grafica mensual" : "Ver grafica mensual";
+  const selectedMetrics = hasMetrics
+    ? sortDailyMetrics(filterMetricsByMonth(metrics, state.monthlyMetricsChartMonth)).reverse()
+    : [];
+  const glucoseMax = Math.max(...selectedMetrics.map((metric) => Number(metric.averageGlucose) || 0), 180);
+  const monthSelectMarkup = hasMetrics
+    ? `
+      <label class="monthly-chart-filter">
+        <span>Mes</span>
+        <select data-monthly-metrics-month-select>
+          ${monthOptions.map((monthKey) => (
+            `<option value="${monthKey}"${state.monthlyMetricsChartMonth === monthKey ? " selected" : ""}>${formatMonthKey(monthKey)}</option>`
+          )).join("")}
+        </select>
+      </label>
+    `
+    : "";
+
+  const chartMarkup = !state.monthlyMetricsChartOpen
+    ? ""
+    : hasMetrics
+      ? `
+        <div class="monthly-chart-card">
+          <div class="monthly-chart-header">
+            <div>
+              <h3>${formatMonthKey(state.monthlyMetricsChartMonth)}</h3>
+              <p>Barras cronologicas por dia para detectar rapido control y descontrol.</p>
+            </div>
+            ${monthSelectMarkup}
+          </div>
+          <div class="monthly-chart-legend">
+            <span><i class="legend-swatch tir"></i>Time in Range</span>
+            <span><i class="legend-swatch glucose"></i>Average Glucose</span>
+          </div>
+          <div class="monthly-chart-scroll">
+            <div class="monthly-chart-grid">
+              ${selectedMetrics.map((metric) => renderMonthlyMetricColumn(metric, glucoseMax)).join("")}
+            </div>
+          </div>
+        </div>
+      `
+      : `
+        <div class="monthly-chart-card monthly-chart-empty">
+          <div class="empty-state">Todavia no hay indicadores diarios para construir la grafica mensual.</div>
+        </div>
+      `;
+
+  elements.monthlyMetricsChartShell.innerHTML = `
+    <div class="monthly-chart-toggle-row">
+      <button class="action-button ghost monthly-chart-toggle" data-action="toggle-monthly-metrics-chart" type="button"${hasMetrics ? "" : " disabled"}>
+        ${toggleLabel}
+      </button>
+      <p class="monthly-chart-helper">${hasMetrics ? "Se despliega debajo sin cambiar la vista principal." : "Carga indicadores diarios para habilitar esta vista."}</p>
+    </div>
+    ${chartMarkup}
+  `;
+
+  const toggleButton = elements.monthlyMetricsChartShell.querySelector('[data-action="toggle-monthly-metrics-chart"]');
+  if (toggleButton) {
+    toggleButton.addEventListener("click", () => {
+      state.monthlyMetricsChartOpen = !state.monthlyMetricsChartOpen;
+      renderStats();
+    });
+  }
+
+  const monthSelect = elements.monthlyMetricsChartShell.querySelector("[data-monthly-metrics-month-select]");
+  if (monthSelect) {
+    monthSelect.addEventListener("input", (event) => {
+      state.monthlyMetricsChartMonth = event.target.value || monthOptions[0] || "";
+      renderStats();
+    });
+  }
+}
+
+function renderMonthlyMetricColumn(metric, glucoseMax) {
+  const dayLabel = String(parseDateKey(metric.metricDate).getDate()).padStart(2, "0");
+  const tirValue = Number(metric.timeInRange) || 0;
+  const glucoseValue = Number(metric.averageGlucose) || 0;
+  const tirHeight = Math.max(10, Math.min(100, tirValue));
+  const glucoseHeight = glucoseMax > 0 ? Math.max(10, Math.min(100, (glucoseValue / glucoseMax) * 100)) : 10;
+  const tirTone = getMonthlyTirTone(tirValue);
+  const glucoseTone = getMonthlyGlucoseTone(glucoseValue);
+
+  return `
+    <article class="monthly-chart-column">
+      <div class="monthly-chart-bars">
+        <div class="monthly-chart-bar-shell">
+          <span class="monthly-chart-value">${formatPercentage(tirValue)}</span>
+          <div class="monthly-chart-bar monthly-chart-bar-tir ${tirTone}" style="height:${tirHeight}%"></div>
+        </div>
+        <div class="monthly-chart-bar-shell">
+          <span class="monthly-chart-value">${formatGlucose(glucoseValue)}</span>
+          <div class="monthly-chart-bar monthly-chart-bar-glucose ${glucoseTone}" style="height:${glucoseHeight}%"></div>
+        </div>
+      </div>
+      <div class="monthly-chart-day">${dayLabel}</div>
+    </article>
+  `;
+}
+
+function getMonthlyTirTone(value) {
+  if (value >= 70) {
+    return "is-good";
+  }
+
+  if (value >= 55) {
+    return "is-mid";
+  }
+
+  return "is-alert";
+}
+
+function getMonthlyGlucoseTone(value) {
+  if (value <= 154) {
+    return "is-good";
+  }
+
+  if (value <= 180) {
+    return "is-mid";
+  }
+
+  return "is-alert";
 }
 
 function hydrateMealFormForDate(mealType, dateKey) {

@@ -666,6 +666,204 @@ textarea {
   margin-bottom: 18px;
 }
 
+.monthly-metrics-chart-shell {
+  margin-bottom: 18px;
+}
+
+.monthly-chart-toggle-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.monthly-chart-toggle {
+  white-space: nowrap;
+}
+
+.monthly-chart-helper {
+  margin: 0;
+  color: #b6cae6;
+  font-size: 0.92rem;
+}
+
+.monthly-chart-card {
+  padding: 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 184, 108, 0.18);
+  background:
+    radial-gradient(circle at top left, rgba(255, 209, 102, 0.18), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(255, 127, 115, 0.14), transparent 30%),
+    linear-gradient(180deg, rgba(43, 25, 12, 0.95), rgba(21, 13, 8, 0.98));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 244, 214, 0.06),
+    inset 0 0 28px rgba(255, 170, 120, 0.06);
+}
+
+.monthly-chart-empty {
+  padding-top: 8px;
+}
+
+.monthly-chart-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: end;
+  margin-bottom: 12px;
+}
+
+.monthly-chart-header h3 {
+  margin: 0 0 6px;
+  color: #ffe4aa;
+}
+
+.monthly-chart-header p {
+  margin: 0;
+  color: #f3ccb1;
+}
+
+.monthly-chart-filter {
+  display: inline-grid;
+  gap: 6px;
+  color: #fff1cf;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.monthly-chart-filter select {
+  min-width: 170px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 206, 144, 0.22);
+  background: rgba(47, 25, 12, 0.82);
+  color: #fff8e7;
+  font: inherit;
+}
+
+.monthly-chart-legend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  color: #f5d7bd;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.legend-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 8px;
+  border-radius: 999px;
+}
+
+.legend-swatch.tir {
+  background: linear-gradient(180deg, #ffd166, #f5a742);
+}
+
+.legend-swatch.glucose {
+  background: linear-gradient(180deg, #ff9f6e, #ff6b57);
+}
+
+.monthly-chart-scroll {
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.monthly-chart-grid {
+  min-width: max-content;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(48px, 56px);
+  gap: 10px;
+  align-items: end;
+}
+
+.monthly-chart-column {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+}
+
+.monthly-chart-bars {
+  height: 220px;
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  align-items: end;
+  padding: 12px 8px 10px;
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
+    repeating-linear-gradient(
+      180deg,
+      rgba(255, 240, 214, 0.08) 0,
+      rgba(255, 240, 214, 0.08) 1px,
+      transparent 1px,
+      transparent 25%
+    );
+  border: 1px solid rgba(255, 220, 170, 0.08);
+}
+
+.monthly-chart-bar-shell {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: end;
+  align-items: center;
+  gap: 8px;
+}
+
+.monthly-chart-value {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #fff1df;
+  text-align: center;
+  line-height: 1.1;
+}
+
+.monthly-chart-bar {
+  width: 100%;
+  min-height: 10px;
+  border-radius: 14px 14px 8px 8px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 0 18px rgba(255, 170, 120, 0.14);
+}
+
+.monthly-chart-bar-tir.is-good {
+  background: linear-gradient(180deg, #ffd978, #f1a53f);
+}
+
+.monthly-chart-bar-tir.is-mid {
+  background: linear-gradient(180deg, #ffbf74, #eb8751);
+}
+
+.monthly-chart-bar-tir.is-alert {
+  background: linear-gradient(180deg, #ff9872, #de5f52);
+}
+
+.monthly-chart-bar-glucose.is-good {
+  background: linear-gradient(180deg, #ffcd7f, #f08c45);
+}
+
+.monthly-chart-bar-glucose.is-mid {
+  background: linear-gradient(180deg, #ffab74, #e06d49);
+}
+
+.monthly-chart-bar-glucose.is-alert {
+  background: linear-gradient(180deg, #ff8f76, #d94f4f);
+}
+
+.monthly-chart-day {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #ffdcb2;
+}
+
 .chart-header {
   display: flex;
   justify-content: space-between;
@@ -1621,7 +1819,9 @@ textarea {
   .panel-header,
   .form-meta,
   .history-header,
-  .insight-panel-heading {
+  .insight-panel-heading,
+  .monthly-chart-header,
+  .monthly-chart-toggle-row {
     flex-direction: column;
     align-items: stretch;
   }
