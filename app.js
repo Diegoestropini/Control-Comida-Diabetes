@@ -52,6 +52,9 @@ const elements = {
   glucoseStart: document.getElementById("glucose-start"),
   glucoseEnd: document.getElementById("glucose-end"),
   glucoseCalculatorResult: document.getElementById("glucose-calculator-result"),
+  foodPredictionInput: document.getElementById("food-prediction-input"),
+  foodPredictionShell: document.getElementById("food-prediction-shell"),
+  foodPredictionResult: document.getElementById("food-prediction-result"),
   dailyMetricsForm: document.getElementById("daily-metrics-form"),
   dailyMetricsMeta: document.getElementById("daily-metrics-meta"),
   dailyMetricsCancel: document.getElementById("daily-metrics-cancel"),
@@ -96,6 +99,7 @@ function initialize() {
   bindEvents();
   closeRecordModal();
   updateGlucoseCalculator();
+  updateFoodPrediction();
   render();
 }
 
@@ -131,6 +135,150 @@ function updateGlucoseCalculator() {
 
   result.className = `glucose-calculator-result ${tone}`;
   result.innerHTML = `<strong>${label}: +${difference} mg/dL</strong><span>Inicial ${start} mg/dL, final ${end} mg/dL.</span>`;
+}
+
+function updateFoodPrediction() {
+  const input = elements.foodPredictionInput;
+  const shell = elements.foodPredictionShell;
+  const result = elements.foodPredictionResult;
+
+  if (!input || !shell || !result) {
+    return;
+  }
+
+  const prediction = predictMealTolerance(input.value, state.records);
+  shell.className = `food-prediction-field ${prediction.tone}`;
+  result.className = `food-prediction-result ${prediction.tone}`;
+  result.innerHTML = `<strong>${prediction.title}</strong><span>${prediction.description}</span>`;
+}
+
+function predictMealTolerance(mealText, records) {
+  const normalizedMeal = normalizeMealSearchText(mealText);
+  const compactMeal = normalizeMealComparisonText(mealText);
+
+  if (!normalizedMeal) {
+    return {
+      tone: "tone-neutral",
+      title: "Esperando una comida",
+      description: "La sugerencia se basa en tus comidas registradas y solo sirve como referencia visual.",
+    };
+  }
+
+  const comparableRecords = records.filter((record) => (
+    record.status === "recorded"
+    && typeof record.mealText === "string"
+    && record.mealText.trim()
+    && ["verde", "amarillo", "rojo"].includes(record.tolerance)
+  ));
+
+  if (!comparableRecords.length) {
+    return {
+      tone: "tone-neutral",
+      title: "Sin historial suficiente",
+      description: "Todavia no hay comidas con tolerancia registrada para comparar esta opcion.",
+    };
+  }
+
+  const inputKeywords = extractMealKeywords(mealText);
+  const weights = { verde: 0, amarillo: 0, rojo: 0 };
+  const sources = { verde: 0, amarillo: 0, rojo: 0 };
+  let exactMatches = 0;
+  let keywordMatches = 0;
+
+  comparableRecords.forEach((record) => {
+    const recordNormalized = normalizeMealSearchText(record.mealText);
+    const recordCompact = normalizeMealComparisonText(record.mealText);
+    const recordKeywords = extractMealKeywords(record.mealText);
+    let score = 0;
+
+    if (recordCompact && recordCompact === compactMeal) {
+      score += 3.4;
+      exactMatches += 1;
+    }
+
+    if (
+      recordCompact
+      && compactMeal
+      && recordCompact !== compactMeal
+      && (
+        recordCompact.includes(compactMeal)
+        || compactMeal.includes(recordCompact)
+      )
+    ) {
+      score += 1.8;
+    }
+
+    const overlapCount = countKeywordOverlap(inputKeywords, recordKeywords);
+    if (overlapCount > 0) {
+      const overlapShare = overlapCount / Math.max(inputKeywords.length, recordKeywords.length, 1);
+      score += 0.9 + (overlapShare * 1.6);
+      keywordMatches += 1;
+    }
+
+    if (score <= 0) {
+      return;
+    }
+
+    weights[record.tolerance] += score;
+    sources[record.tolerance] += 1;
+  });
+
+  const totalWeight = weights.verde + weights.amarillo + weights.rojo;
+  if (totalWeight <= 0) {
+    return {
+      tone: "tone-neutral",
+      title: "Sin coincidencias claras",
+      description: "No encontre comidas parecidas en tu historial como para sugerir un color confiable.",
+    };
+  }
+
+  const ordered = [
+    { key: "verde", weight: weights.verde, sources: sources.verde },
+    { key: "amarillo", weight: weights.amarillo, sources: sources.amarillo },
+    { key: "rojo", weight: weights.rojo, sources: sources.rojo },
+  ].sort((left, right) => right.weight - left.weight);
+
+  const top = ordered[0];
+  const runnerUp = ordered[1];
+  const share = top.weight / totalWeight;
+  const mixedSignal = runnerUp.weight > 0 && Math.abs(top.weight - runnerUp.weight) / totalWeight < 0.16;
+  const cautiousWinner = top.key !== "amarillo" && (share < 0.52 || mixedSignal);
+  const finalKey = cautiousWinner ? "amarillo" : top.key;
+
+  const config = {
+    verde: {
+      tone: "tone-green",
+      title: "Tendencia favorable",
+      detail: "Se parece mas a comidas que te dieron buena tolerancia.",
+    },
+    amarillo: {
+      tone: "tone-yellow",
+      title: "Tendencia intermedia",
+      detail: "Hay señales mixtas o poca evidencia; conviene tomarlo con cautela.",
+    },
+    rojo: {
+      tone: "tone-red",
+      title: "Tendencia sensible",
+      detail: "Se parece mas a comidas que en tu historial salieron peor.",
+    },
+  };
+
+  const evidenceBits = [];
+  if (exactMatches > 0) {
+    evidenceBits.push(`${exactMatches} coincidencia(s) casi exacta(s)`);
+  }
+  if (keywordMatches > 0) {
+    evidenceBits.push(`${keywordMatches} registro(s) con ingredientes parecidos`);
+  }
+
+  const label = config[finalKey];
+  const evidenceText = evidenceBits.length ? ` Referencia: ${evidenceBits.join(" y ")}.` : "";
+
+  return {
+    tone: label.tone,
+    title: label.title,
+    description: `${label.detail} Base actual: ${top.sources} registro(s) relevantes en ${top.key}.${evidenceText}`,
+  };
 }
 
 function saveTolerance(mealType) {
@@ -230,6 +378,7 @@ function render() {
   renderDailyMetricsForm();
   renderStats();
   renderHistory();
+  updateFoodPrediction();
 }
 
 function renderDailyMetricsForm() {
@@ -832,6 +981,10 @@ function normalizeMealSearchText(value) {
     .trim();
 }
 
+function normalizeMealComparisonText(value) {
+  return normalizeMealSearchText(value).replace(/,/g, " ").replace(/\s+/g, " ").trim();
+}
+
 function extractMealKeywords(mealText) {
   const stopWords = new Set([
     "a", "al", "algo", "con", "de", "del", "despues", "dos", "el", "en", "la", "las", "lo", "los",
@@ -844,6 +997,11 @@ function extractMealKeywords(mealText) {
       .split(/[\s,]+/)
       .filter((token) => token.length >= 3 && !stopWords.has(token) && !/^\d+$/.test(token))
   )).slice(0, 8);
+}
+
+function countKeywordOverlap(leftKeywords, rightKeywords) {
+  const rightSet = new Set(rightKeywords);
+  return leftKeywords.reduce((count, keyword) => count + (rightSet.has(keyword) ? 1 : 0), 0);
 }
 
 function formatRankingLabel(value) {
@@ -2468,6 +2626,7 @@ function bindEvents() {
     event.preventDefault();
     saveDailyMetric();
   });
+  elements.foodPredictionInput?.addEventListener("input", updateFoodPrediction);
   elements.digestiveEventSave.addEventListener("click", saveDigestiveEvent);
   elements.stressEventSave.addEventListener("click", saveStressEvent);
   elements.dailyMetricsForm.elements.metricDate.addEventListener("input", () => {

@@ -20,32 +20,54 @@
         </p>
       </div>
       <div class="hero-actions">
-        <button id="quick-entry-button" class="action-button primary" type="button">Registro rapido</button>
-        <button id="export-button" class="action-button secondary" type="button">Exportar JSON</button>
-        <button id="force-close-button" class="action-button ghost" type="button">Cerrar dia ahora</button>
-        <section class="glucose-calculator" aria-labelledby="glucose-calculator-title">
-          <div class="glucose-calculator-header">
-            <div>
-              <p class="panel-kicker">Ayuda visual</p>
-              <h2 id="glucose-calculator-title">Calculadora de pico</h2>
+        <div class="hero-buttons">
+          <button id="quick-entry-button" class="action-button primary" type="button">Registro rapido</button>
+          <button id="export-button" class="action-button secondary" type="button">Exportar JSON</button>
+          <button id="force-close-button" class="action-button ghost" type="button">Cerrar dia ahora</button>
+        </div>
+        <div class="hero-tools">
+          <section class="glucose-calculator" aria-labelledby="glucose-calculator-title">
+            <div class="glucose-calculator-header">
+              <div>
+                <p class="panel-kicker">Ayuda visual</p>
+                <h2 id="glucose-calculator-title">Calculadora de pico</h2>
+              </div>
+              <span class="meal-badge metrics">Sin registro</span>
             </div>
-            <span class="meal-badge metrics">Sin registro</span>
-          </div>
-          <div class="glucose-calculator-grid">
-            <label>
-              <span>Glucosa inicial</span>
-              <input id="glucose-start" type="number" min="0" max="600" step="1" placeholder="Ejemplo: 110">
+            <div class="glucose-calculator-grid">
+              <label>
+                <span>Glucosa inicial</span>
+                <input id="glucose-start" type="number" min="0" max="600" step="1" placeholder="Ejemplo: 110">
+              </label>
+              <label>
+                <span>Glucosa final</span>
+                <input id="glucose-end" type="number" min="0" max="600" step="1" placeholder="Ejemplo: 180">
+              </label>
+            </div>
+            <div id="glucose-calculator-result" class="glucose-calculator-result tone-neutral">
+              <strong>Esperando valores</strong>
+              <span>Esta calculadora solo muestra el detalle del pico y no guarda datos.</span>
+            </div>
+          </section>
+
+          <section class="food-prediction-card" aria-labelledby="food-prediction-title">
+            <div class="glucose-calculator-header">
+              <div>
+                <p class="panel-kicker">Simulacion</p>
+                <h2 id="food-prediction-title">Prediccion de comida</h2>
+              </div>
+              <span class="meal-badge metrics">Hipotetica</span>
+            </div>
+            <label class="food-prediction-field" id="food-prediction-shell">
+              <span>Escribe una comida para estimar como podria ir</span>
+              <textarea id="food-prediction-input" rows="4" placeholder="Ejemplo: Pasta con pollo, calabaza asada y yogur natural"></textarea>
             </label>
-            <label>
-              <span>Glucosa final</span>
-              <input id="glucose-end" type="number" min="0" max="600" step="1" placeholder="Ejemplo: 180">
-            </label>
-          </div>
-          <div id="glucose-calculator-result" class="glucose-calculator-result tone-neutral">
-            <strong>Esperando valores</strong>
-            <span>Esta calculadora solo muestra el detalle del pico y no guarda datos.</span>
-          </div>
-        </section>
+            <div id="food-prediction-result" class="food-prediction-result tone-neutral">
+              <strong>Esperando una comida</strong>
+              <span>La sugerencia se basa en tus comidas registradas y solo sirve como referencia visual.</span>
+            </div>
+          </section>
+        </div>
       </div>
     </header>
 

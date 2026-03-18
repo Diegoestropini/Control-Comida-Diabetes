@@ -127,14 +127,27 @@ textarea {
 
 .hero-actions {
   display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: stretch;
+  width: min(760px, 100%);
+}
+
+.hero-buttons {
+  display: flex;
   gap: 12px;
   flex-wrap: wrap;
   justify-content: flex-end;
-  align-items: flex-start;
+}
+
+.hero-tools {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .glucose-calculator {
-  width: min(360px, 100%);
+  width: 100%;
   padding: 18px;
   border-radius: 20px;
   background: linear-gradient(180deg, rgba(14, 29, 50, 0.94), rgba(8, 18, 32, 0.98));
@@ -204,6 +217,90 @@ textarea {
 .glucose-calculator-result.tone-red {
   background: rgba(255, 127, 115, 0.14);
   border-color: rgba(255, 127, 115, 0.42);
+  color: #ffe1dd;
+}
+
+.food-prediction-card {
+  padding: 18px;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at top right, rgba(115, 184, 255, 0.08), transparent 34%),
+    linear-gradient(180deg, rgba(16, 28, 44, 0.96), rgba(9, 17, 31, 0.99));
+  border: 1px solid rgba(145, 178, 227, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.food-prediction-field {
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(145, 178, 227, 0.14);
+  background: rgba(255, 255, 255, 0.03);
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.food-prediction-field textarea {
+  min-height: 104px;
+  background: rgba(4, 10, 19, 0.72);
+}
+
+.food-prediction-field.tone-neutral {
+  border-color: rgba(145, 178, 227, 0.14);
+}
+
+.food-prediction-field.tone-green {
+  background: rgba(84, 214, 148, 0.08);
+  border-color: rgba(84, 214, 148, 0.32);
+  box-shadow: inset 0 0 0 1px rgba(84, 214, 148, 0.05);
+}
+
+.food-prediction-field.tone-yellow {
+  background: rgba(255, 209, 102, 0.08);
+  border-color: rgba(255, 209, 102, 0.32);
+  box-shadow: inset 0 0 0 1px rgba(255, 209, 102, 0.04);
+}
+
+.food-prediction-field.tone-red {
+  background: rgba(255, 127, 115, 0.08);
+  border-color: rgba(255, 127, 115, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(255, 127, 115, 0.04);
+}
+
+.food-prediction-result {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(145, 178, 227, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.food-prediction-result strong,
+.food-prediction-result span {
+  display: block;
+}
+
+.food-prediction-result strong {
+  margin-bottom: 4px;
+}
+
+.food-prediction-result.tone-neutral {
+  border-color: rgba(145, 178, 227, 0.14);
+}
+
+.food-prediction-result.tone-green {
+  background: rgba(84, 214, 148, 0.12);
+  border-color: rgba(84, 214, 148, 0.38);
+  color: #dff9eb;
+}
+
+.food-prediction-result.tone-yellow {
+  background: rgba(255, 209, 102, 0.12);
+  border-color: rgba(255, 209, 102, 0.38);
+  color: #fff3d1;
+}
+
+.food-prediction-result.tone-red {
+  background: rgba(255, 127, 115, 0.12);
+  border-color: rgba(255, 127, 115, 0.34);
   color: #ffe1dd;
 }
 
@@ -1836,6 +1933,11 @@ textarea {
     justify-content: flex-start;
   }
 
+  .hero-buttons {
+    justify-content: flex-start;
+  }
+
+  .hero-tools,
   .glucose-calculator-grid {
     grid-template-columns: 1fr;
   }
