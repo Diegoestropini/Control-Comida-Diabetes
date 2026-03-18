@@ -1612,6 +1612,12 @@ textarea {
   margin: 2px 0 0;
 }
 
+.repeated-food-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+}
+
 .empty-state.compact {
   padding: 4px 0;
 }

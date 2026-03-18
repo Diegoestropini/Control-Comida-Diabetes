@@ -24,6 +24,7 @@ const state = {
   showAllStressEvents: false,
   showAllTimeline: false,
   showAllHistory: false,
+  showAllRepeatedFood: false,
   insightsMonth: "all",
   monthlyMetricsChartOpen: false,
   monthlyMetricsChartMonth: "",
@@ -613,6 +614,10 @@ function renderRepeatedFoodRanking(ranking) {
     return;
   }
 
+  const collapsedLimit = 4;
+  const hasOverflow = ranking.safe.length > collapsedLimit || ranking.risky.length > collapsedLimit;
+  const extraCount = Math.max(ranking.safe.length - collapsedLimit, 0) + Math.max(ranking.risky.length - collapsedLimit, 0);
+
   elements.repeatedFoodRanking.innerHTML = `
     <div class="repeated-food-columns">
       <section class="repeated-food-column repeated-food-column-safe">
@@ -620,28 +625,47 @@ function renderRepeatedFoodRanking(ranking) {
           <strong>Comidas seguras</strong>
           <span>Verdes consecutivos</span>
         </div>
-        ${renderRepeatedFoodList(ranking.safe, "safe")}
+        ${renderRepeatedFoodList(ranking.safe, "safe", collapsedLimit)}
       </section>
       <section class="repeated-food-column repeated-food-column-risk">
         <div class="repeated-food-column-header">
           <strong>Comidas riesgosas</strong>
           <span>Rojos y amarillos frecuentes</span>
         </div>
-        ${renderRepeatedFoodList(ranking.risky, "risk")}
+        ${renderRepeatedFoodList(ranking.risky, "risk", collapsedLimit)}
       </section>
     </div>
+    ${hasOverflow
+      ? `
+        <div class="repeated-food-actions">
+          <button class="table-action" data-action="toggle-repeated-food" type="button">
+            ${state.showAllRepeatedFood ? "Mostrar menos" : `Ver mas (${extraCount} mas)`}
+          </button>
+        </div>
+      `
+      : ""}
     <p class="repeated-food-footnote">
       Se mezcla coincidencia de comida completa y palabras clave repetidas usando solo registros con tolerancia verde, amarilla o roja.
     </p>
   `;
+
+  const toggleButton = elements.repeatedFoodRanking.querySelector('[data-action="toggle-repeated-food"]');
+  if (toggleButton) {
+    toggleButton.addEventListener("click", () => {
+      state.showAllRepeatedFood = !state.showAllRepeatedFood;
+      renderStats();
+    });
+  }
 }
 
-function renderRepeatedFoodList(items, tone) {
+function renderRepeatedFoodList(items, tone, collapsedLimit) {
   if (!items.length) {
     return '<div class="empty-state compact">Todavia no hay suficientes repeticiones.</div>';
   }
 
-  return items.map((item, index) => `
+  const visibleItems = state.showAllRepeatedFood ? items : items.slice(0, collapsedLimit);
+
+  return visibleItems.map((item, index) => `
     <article class="repeated-food-item repeated-food-item-${tone}">
       <div class="repeated-food-item-top">
         <span class="repeated-food-rank">#${index + 1}</span>
