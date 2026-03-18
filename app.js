@@ -2695,6 +2695,9 @@ function bindEvents() {
     }
     render();
   });
+  [elements.glucoseStart, elements.glucoseEnd].forEach((input) => {
+    input.addEventListener("input", updateGlucoseCalculator);
+  });
   [elements.filterFrom, elements.filterTo, elements.filterTolerance].forEach((control) => {
     control.addEventListener("input", () => {
       state.showAllHistory = false;
