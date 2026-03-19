@@ -1518,7 +1518,9 @@ function computeStreakInsights(records, dailyMetrics) {
       .map((record) => record.recordDate)
   );
   const metricMap = new Map(dailyMetrics.map((metric) => [metric.metricDate, Number(metric.timeInRange)]));
-  const lastTrackedDay = mealDays[0] || metricDays[0] || null;
+  const lastTrackedDay = [mealDays[0], metricDays[0]]
+    .filter(Boolean)
+    .sort((left, right) => right.localeCompare(left))[0] || null;
 
   return {
     greenDays: countConsecutiveDays(mealDays, (dateKey) => greenDays.has(dateKey)),
@@ -2051,7 +2053,16 @@ function loadDailyMetrics() {
     }
 
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.map(normalizeDailyMetric).filter(Boolean) : [];
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    const normalized = parsed.map(normalizeDailyMetric).filter(Boolean);
+    if (normalized.length !== parsed.length) {
+      localStorage.setItem(DAILY_METRICS_KEY, JSON.stringify(normalized));
+    }
+
+    return normalized;
   } catch (error) {
     console.error("No se pudieron leer los indicadores diarios guardados.", error);
     return [];
@@ -2146,7 +2157,15 @@ function normalizeDailyMetric(metric) {
   const averageGlucose = Number(metric.averageGlucose);
   const nowIso = new Date().toISOString();
 
-  if (!metricDate || !Number.isFinite(timeInRange) || !Number.isFinite(averageGlucose)) {
+  if (
+    !metricDate
+    || !Number.isFinite(timeInRange)
+    || timeInRange < 0
+    || timeInRange > 100
+    || !Number.isFinite(averageGlucose)
+    || averageGlucose < 0
+    || averageGlucose > 500
+  ) {
     return null;
   }
 
