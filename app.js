@@ -2026,7 +2026,17 @@ function loadRecords() {
     }
 
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.map(normalizeRecord).filter(Boolean) : [];
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    const normalized = parsed.map(normalizeRecord).filter(Boolean);
+    const { records, changed } = dedupeRecords(normalized);
+    if (changed) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+    }
+
+    return records;
   } catch (error) {
     console.error("No se pudieron leer los datos guardados.", error);
     return [];
@@ -2056,7 +2066,16 @@ function loadDigestiveEvents() {
     }
 
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.map(normalizeDigestiveEvent).filter(Boolean) : [];
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    const normalized = parsed.map(normalizeDigestiveEvent).filter(Boolean);
+    if (normalized.some((event, index) => event.recordedAt !== parsed[index]?.recordedAt)) {
+      localStorage.setItem(DIGESTIVE_EVENTS_KEY, JSON.stringify(normalized));
+    }
+
+    return normalized;
   } catch (error) {
     console.error("No se pudieron leer los eventos digestivos guardados.", error);
     return [];
@@ -2071,7 +2090,16 @@ function loadStressEvents() {
     }
 
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.map(normalizeStressEvent).filter(Boolean) : [];
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    const normalized = parsed.map(normalizeStressEvent).filter(Boolean);
+    if (normalized.some((event, index) => event.recordedAt !== parsed[index]?.recordedAt)) {
+      localStorage.setItem(STRESS_EVENTS_KEY, JSON.stringify(normalized));
+    }
+
+    return normalized;
   } catch (error) {
     console.error("No se pudieron leer los eventos de estres guardados.", error);
     return [];
@@ -2147,7 +2175,7 @@ function normalizeDigestiveEvent(event) {
   return {
     id: typeof event.id === "string" ? event.id : createDigestiveEventId(),
     eventType,
-    recordedAt,
+    recordedAt: normalizeStoredTimestamp(recordedAt),
     source: typeof event.source === "string" ? event.source : "manual",
   };
 }
@@ -2167,9 +2195,53 @@ function normalizeStressEvent(event) {
   return {
     id: typeof event.id === "string" ? event.id : createStressEventId(),
     stressLevel,
-    recordedAt,
+    recordedAt: normalizeStoredTimestamp(recordedAt),
     source: typeof event.source === "string" ? event.source : "manual",
   };
+}
+
+function dedupeRecords(records) {
+  const bySlot = new Map();
+  let changed = false;
+
+  records.forEach((record) => {
+    const key = `${record.recordDate}::${record.mealType}`;
+    const existing = bySlot.get(key);
+
+    if (!existing) {
+      bySlot.set(key, record);
+      return;
+    }
+
+    changed = true;
+    if (compareRecordFreshness(record, existing) > 0) {
+      bySlot.set(key, record);
+    }
+  });
+
+  return {
+    records: [...bySlot.values()],
+    changed,
+  };
+}
+
+function compareRecordFreshness(left, right) {
+  const leftUpdated = Date.parse(left.updatedAt || left.createdAt || "");
+  const rightUpdated = Date.parse(right.updatedAt || right.createdAt || "");
+
+  if (Number.isFinite(leftUpdated) && Number.isFinite(rightUpdated) && leftUpdated !== rightUpdated) {
+    return leftUpdated - rightUpdated;
+  }
+
+  if (Number.isFinite(leftUpdated) && !Number.isFinite(rightUpdated)) {
+    return 1;
+  }
+
+  if (!Number.isFinite(leftUpdated) && Number.isFinite(rightUpdated)) {
+    return -1;
+  }
+
+  return String(left.id).localeCompare(String(right.id));
 }
 
 function persistRecords() {
@@ -2326,6 +2398,19 @@ function getLocalTimestamp(date) {
   const minutes = String(date.getMinutes()).padStart(2, "0");
   const seconds = String(date.getSeconds()).padStart(2, "0");
   return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+}
+
+function normalizeStoredTimestamp(value) {
+  if (typeof value !== "string" || !value.trim()) {
+    return new Date().toISOString();
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return new Date().toISOString();
+  }
+
+  return parsed.toISOString();
 }
 
 function getLocalDateKey(date) {
@@ -2692,6 +2777,7 @@ function bindEvents() {
   });
   ["recordDate", "mealType"].forEach((fieldName) => {
     modal.mealForm.elements[fieldName].addEventListener("input", () => {
+      syncModalEditingRecord(modal.mealForm.elements.recordDate.value, modal.mealForm.elements.mealType.value);
       hydrateRecordModal(modal.mealForm.elements.recordDate.value, modal.mealForm.elements.mealType.value);
     });
   });
@@ -2878,7 +2964,7 @@ function saveDigestiveEvent() {
     return;
   }
 
-  const timestamp = getLocalTimestamp(new Date());
+  const timestamp = new Date().toISOString();
   if (editingEvent) {
     editingEvent.eventType = eventType;
   } else {
@@ -2910,7 +2996,7 @@ function saveStressEvent() {
     return;
   }
 
-  const timestamp = getLocalTimestamp(new Date());
+  const timestamp = new Date().toISOString();
   if (editingEvent) {
     editingEvent.stressLevel = stressLevel;
   } else {
@@ -3252,6 +3338,7 @@ function openRecordModal({ record = null, dateKey = "", mealType = "lunch", sect
   modal.shell.hidden = false;
   modal.shell.dataset.section = section;
   modal.shell.dataset.editingRecordId = record?.id || "";
+  modal.shell.dataset.sourceRecordId = record?.id || "";
   hydrateRecordModal(targetDate, targetMealType);
   if (section === "tolerance") {
     modal.toleranceForm.scrollIntoView({ block: "nearest" });
@@ -3262,8 +3349,22 @@ function closeRecordModal() {
   const modal = getModalUI();
   modal.shell.hidden = true;
   delete modal.shell.dataset.editingRecordId;
+  delete modal.shell.dataset.sourceRecordId;
   modal.notice.textContent = "";
   modal.notice.classList.remove("is-visible");
+}
+
+function syncModalEditingRecord(dateKey, mealType) {
+  const modal = getModalUI();
+  const sourceRecordId = modal.shell.dataset.sourceRecordId || "";
+  const sourceRecord = sourceRecordId ? findRecordById(sourceRecordId) : null;
+
+  if (sourceRecord && sourceRecord.recordDate === dateKey && sourceRecord.mealType === mealType) {
+    modal.shell.dataset.editingRecordId = sourceRecord.id;
+    return;
+  }
+
+  delete modal.shell.dataset.editingRecordId;
 }
 
 function saveMealRecord(mealType) {
@@ -3433,6 +3534,7 @@ function saveModalMeal() {
 
   upsertRecord(record);
   modal.shell.dataset.editingRecordId = record.id;
+  modal.shell.dataset.sourceRecordId = record.id;
   modal.notice.textContent = `${MEAL_LABELS[mealType]} ${existingRecord ? "actualizado" : "guardado"} para ${formatDate(recordDate)}.`;
   modal.notice.classList.add("is-visible");
   hydrateRecordModal(recordDate, mealType);
