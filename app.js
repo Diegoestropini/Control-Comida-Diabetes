@@ -313,10 +313,15 @@ function saveTolerance(mealType) {
 function runDailyClosure(options = {}) {
   const now = new Date();
   const previousDay = shiftDate(now, -1);
-  const lastClosure = localStorage.getItem(CLOSURE_KEY);
+  const storedLastClosure = localStorage.getItem(CLOSURE_KEY);
+  const lastClosure = isValidDateKey(storedLastClosure) ? storedLastClosure : null;
   const endKey = options.forceDateKey || getLocalDateKey(previousDay);
   const todayKey = getLocalDateKey(now);
   const isManualTodayClosure = options.forceDateKey === todayKey;
+
+  if (storedLastClosure && !lastClosure) {
+    localStorage.removeItem(CLOSURE_KEY);
+  }
 
   if (!options.forceDateKey && lastClosure === endKey) {
     return { createdCount: 0, skippedFutureMeals: 0, touchedDates: [] };
@@ -2123,7 +2128,7 @@ function normalizeRecord(record) {
   }
 
   const mealType = record.mealType === "lunch" || record.mealType === "dinner" ? record.mealType : null;
-  const recordDate = typeof record.recordDate === "string" ? record.recordDate : null;
+  const recordDate = typeof record.recordDate === "string" && isValidDateKey(record.recordDate) ? record.recordDate : null;
   const scheduledTime = typeof record.scheduledTime === "string" ? record.scheduledTime : (mealType ? DEFAULT_TIMES[mealType] : "00:00");
   const status = record.status === "missing" ? "missing" : "recorded";
   const tolerance = ["verde", "amarillo", "rojo"].includes(record.tolerance) ? record.tolerance : null;
@@ -2152,7 +2157,7 @@ function normalizeDailyMetric(metric) {
     return null;
   }
 
-  const metricDate = typeof metric.metricDate === "string" ? metric.metricDate : null;
+  const metricDate = typeof metric.metricDate === "string" && isValidDateKey(metric.metricDate) ? metric.metricDate : null;
   const timeInRange = Number(metric.timeInRange);
   const averageGlucose = Number(metric.averageGlucose);
   const nowIso = new Date().toISOString();
@@ -2453,9 +2458,7 @@ function shiftDate(date, days) {
 
 function getMealsEligibleForClosure(dateKey, referenceDate, options = {}) {
   if (options.forceDateKey === dateKey) {
-    if (dateKey !== getLocalDateKey(referenceDate)) {
-      return Object.keys(DEFAULT_TIMES);
-    }
+    return Object.keys(DEFAULT_TIMES);
   }
 
   return Object.keys(DEFAULT_TIMES).filter((mealType) => (
@@ -2464,8 +2467,12 @@ function getMealsEligibleForClosure(dateKey, referenceDate, options = {}) {
 }
 
 function collectDatesToClose(lastClosureKey, endKey) {
+  if (!isValidDateKey(endKey)) {
+    return [];
+  }
+
   const endDate = parseDateKey(endKey);
-  const startDate = lastClosureKey ? shiftDate(parseDateKey(lastClosureKey), 1) : endDate;
+  const startDate = isValidDateKey(lastClosureKey) ? shiftDate(parseDateKey(lastClosureKey), 1) : endDate;
   const dates = [];
   let cursor = new Date(startDate);
 
@@ -2480,6 +2487,21 @@ function collectDatesToClose(lastClosureKey, endKey) {
 function parseDateKey(dateKey) {
   const [year, month, day] = dateKey.split("-").map(Number);
   return new Date(year, month - 1, day);
+}
+
+function isValidDateKey(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+
+  const [year, month, day] = value.split("-").map(Number);
+  const parsed = new Date(year, month - 1, day);
+  return (
+    !Number.isNaN(parsed.getTime())
+    && parsed.getFullYear() === year
+    && parsed.getMonth() === month - 1
+    && parsed.getDate() === day
+  );
 }
 
 function capitalize(value) {
