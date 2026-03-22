@@ -2087,7 +2087,7 @@ function loadDigestiveEvents() {
     }
 
     const normalized = parsed.map(normalizeDigestiveEvent).filter(Boolean);
-    if (normalized.some((event, index) => event.recordedAt !== parsed[index]?.recordedAt)) {
+    if (JSON.stringify(normalized) !== JSON.stringify(parsed)) {
       localStorage.setItem(DIGESTIVE_EVENTS_KEY, JSON.stringify(normalized));
     }
 
@@ -2111,7 +2111,7 @@ function loadStressEvents() {
     }
 
     const normalized = parsed.map(normalizeStressEvent).filter(Boolean);
-    if (normalized.some((event, index) => event.recordedAt !== parsed[index]?.recordedAt)) {
+    if (JSON.stringify(normalized) !== JSON.stringify(parsed)) {
       localStorage.setItem(STRESS_EVENTS_KEY, JSON.stringify(normalized));
     }
 
@@ -2963,6 +2963,11 @@ function saveDailyMetric() {
 
   if (!Number.isFinite(averageGlucose) || averageGlucose < 0) {
     setNotice("La glucosa media debe ser un valor valido en mg/dL.");
+    return;
+  }
+
+  if (averageGlucose > 500) {
+    setNotice("La glucosa media no puede superar 500 mg/dL.");
     return;
   }
 
