@@ -254,7 +254,7 @@ function predictMealTolerance(mealText, records) {
     amarillo: {
       tone: "tone-yellow",
       title: "Tendencia intermedia",
-      detail: "Hay señales mixtas o poca evidencia; conviene tomarlo con cautela.",
+      detail: "Hay senales mixtas o poca evidencia; conviene tomarlo con cautela.",
     },
     rojo: {
       tone: "tone-red",
@@ -290,12 +290,12 @@ function saveTolerance(mealType) {
   const record = editingRecord || findRecordForDate(recordDate, mealType);
 
   if (!record) {
-    setNotice(`Primero guardá el ${MEAL_LABELS[mealType].toLowerCase()} antes de registrar tolerancia.`);
+    setNotice(`Primero guarda el ${MEAL_LABELS[mealType].toLowerCase()} antes de registrar tolerancia.`);
     return;
   }
 
   if (record.status === "missing") {
-    setNotice(`No se puede asignar tolerancia a un registro marcado como “no registró nada”.`);
+    setNotice('No se puede asignar tolerancia a un registro marcado como "no registro nada".');
     return;
   }
 
@@ -316,6 +316,7 @@ function runDailyClosure(options = {}) {
   const storedLastClosure = localStorage.getItem(CLOSURE_KEY);
   const lastClosure = isValidDateKey(storedLastClosure) ? storedLastClosure : null;
   const endKey = options.forceDateKey || getLocalDateKey(previousDay);
+  const derivedStartKey = lastClosure ? null : deriveClosureStartKey(endKey);
   const todayKey = getLocalDateKey(now);
   const isManualTodayClosure = options.forceDateKey === todayKey;
 
@@ -327,7 +328,7 @@ function runDailyClosure(options = {}) {
     return { createdCount: 0, skippedFutureMeals: 0, touchedDates: [] };
   }
 
-  const datesToClose = collectDatesToClose(lastClosure, endKey);
+  const datesToClose = collectDatesToClose(lastClosure, endKey, derivedStartKey);
   if (!datesToClose.length) {
     return { createdCount: 0, skippedFutureMeals: 0, touchedDates: [] };
   }
@@ -399,7 +400,7 @@ function renderDailyMetricsForm() {
     form.elements.metricDate.value = editingMetric.metricDate;
     form.elements.timeInRange.value = editingMetric.timeInRange;
     form.elements.averageGlucose.value = editingMetric.averageGlucose;
-    elements.dailyMetricsMeta.textContent = `Editando indicadores del ${formatDate(editingMetric.metricDate)}. Se actualizará el mismo día sin duplicarlo.`;
+    elements.dailyMetricsMeta.textContent = `Editando indicadores del ${formatDate(editingMetric.metricDate)}. Se actualiza el mismo dia sin duplicarlo.`;
     return;
   }
 
@@ -409,7 +410,7 @@ function renderDailyMetricsForm() {
   form.elements.timeInRange.value = existingMetric?.timeInRange ?? "";
   form.elements.averageGlucose.value = existingMetric?.averageGlucose ?? "";
   elements.dailyMetricsMeta.textContent = existingMetric
-    ? `Ya existe un indicador para ${formatDate(selectedDate)}. Si guardás, se actualizará.`
+    ? `Ya existe un indicador para ${formatDate(selectedDate)}. Si guardas, se actualiza.`
     : "Este registro es independiente de almuerzo y cena. Puede tener otra fecha y se exporta en JSON.";
 }
 
@@ -1029,7 +1030,7 @@ function escapeHtml(value) {
 
 function renderDailyMetricsBoard(metrics) {
   if (!metrics.length) {
-    elements.dailyMetricsBoard.innerHTML = '<div class="metric-day-empty">Todavía no hay indicadores diarios cargados.</div>';
+    elements.dailyMetricsBoard.innerHTML = '<div class="metric-day-empty">Todavia no hay indicadores diarios cargados.</div>';
     return;
   }
 
@@ -2457,7 +2458,7 @@ function shiftDate(date, days) {
 }
 
 function getMealsEligibleForClosure(dateKey, referenceDate, options = {}) {
-  if (options.forceDateKey === dateKey) {
+  if (options.forceDateKey === dateKey && dateKey !== getLocalDateKey(referenceDate)) {
     return Object.keys(DEFAULT_TIMES);
   }
 
@@ -2466,13 +2467,20 @@ function getMealsEligibleForClosure(dateKey, referenceDate, options = {}) {
   ));
 }
 
-function collectDatesToClose(lastClosureKey, endKey) {
+function collectDatesToClose(lastClosureKey, endKey, fallbackStartKey = null) {
   if (!isValidDateKey(endKey)) {
     return [];
   }
 
   const endDate = parseDateKey(endKey);
-  const startDate = isValidDateKey(lastClosureKey) ? shiftDate(parseDateKey(lastClosureKey), 1) : endDate;
+  const startKey = isValidDateKey(lastClosureKey)
+    ? getLocalDateKey(shiftDate(parseDateKey(lastClosureKey), 1))
+    : fallbackStartKey || endKey;
+  if (!isValidDateKey(startKey)) {
+    return [];
+  }
+
+  const startDate = parseDateKey(startKey);
   const dates = [];
   let cursor = new Date(startDate);
 
@@ -2482,6 +2490,26 @@ function collectDatesToClose(lastClosureKey, endKey) {
   }
 
   return dates;
+}
+
+function deriveClosureStartKey(endKey) {
+  if (!isValidDateKey(endKey)) {
+    return null;
+  }
+
+  const lastTrackedDate = [
+    ...state.records.map((record) => record.recordDate),
+    ...state.dailyMetrics.map((metric) => metric.metricDate),
+  ]
+    .filter((dateKey) => isValidDateKey(dateKey) && dateKey < endKey)
+    .sort((left, right) => right.localeCompare(left))[0];
+
+  if (!lastTrackedDate) {
+    return endKey;
+  }
+
+  const nextDate = getLocalDateKey(shiftDate(parseDateKey(lastTrackedDate), 1));
+  return nextDate > endKey ? null : nextDate;
 }
 
 function parseDateKey(dateKey) {
@@ -2681,12 +2709,12 @@ function hydrateMealFormForDate(mealType, dateKey) {
 
   if (record) {
     if (record.status === "missing") {
-      elements.formMeta[mealType].textContent = `Ese ${MEAL_LABELS[mealType].toLowerCase()} quedó como “no registró nada”. Podés reemplazarlo cargando la comida ahora.`;
+      elements.formMeta[mealType].textContent = `Ese ${MEAL_LABELS[mealType].toLowerCase()} quedo como "no registro nada". Podes reemplazarlo cargando la comida ahora.`;
     } else {
-      elements.formMeta[mealType].textContent = `Ya existe un registro para ${formatDate(targetDate)}. Si guardás, se actualizará.`;
+      elements.formMeta[mealType].textContent = `Ya existe un registro para ${formatDate(targetDate)}. Si guardas, se actualiza.`;
     }
   } else {
-    elements.formMeta[mealType].textContent = "Se guardará con la fecha y hora local exacta del registro.";
+    elements.formMeta[mealType].textContent = "Se guarda con la fecha y hora local exacta del registro.";
   }
 }
 
