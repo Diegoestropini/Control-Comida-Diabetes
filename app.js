@@ -104,11 +104,13 @@ function initialize() {
 }
 
 function updateGlucoseCalculator() {
-  const start = Number(elements.glucoseStart.value);
-  const end = Number(elements.glucoseEnd.value);
+  const startValue = elements.glucoseStart.value.trim();
+  const endValue = elements.glucoseEnd.value.trim();
+  const start = Number(startValue);
+  const end = Number(endValue);
   const result = elements.glucoseCalculatorResult;
 
-  if (!Number.isFinite(start) || !Number.isFinite(end)) {
+  if (!startValue || !endValue || !Number.isFinite(start) || !Number.isFinite(end)) {
     result.className = "glucose-calculator-result tone-neutral";
     result.innerHTML = "<strong>Esperando valores</strong><span>Esta calculadora solo muestra el detalle del pico y no guarda datos.</span>";
     return;
